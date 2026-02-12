@@ -1,12 +1,12 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-import Home from "./pages/home";
+import Home from "./pages/Home";
 import SelectPersonType from "./pages/SelectPersonType";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import VerifyPhone from "./pages/VerifyPhone";
 
-import Dashboard from "./pages/dashboard";
+import Dashboard from "./pages/Dashboard";
 
 // Onboarding
 import Onboarding from "./pages/Onboarding";
