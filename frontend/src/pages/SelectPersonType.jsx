@@ -277,7 +277,7 @@ export default function SelectPersonType() {
             {/* Indicador de progreso (mobile) */}
             <div className="fixed bottom-4 left-4 md:hidden">
                 <div className="bg-white rounded-full shadow-lg px-4 py-2 flex items-center">
-                    <div className="w-2 h-2 rounded-full bg-blue-600 mr-2"></div>
+                    <div className="w-2 h-2 rounded-full bg-[#279a94] mr-2"></div>
                     <span className="text-sm font-medium text-gray-700">Paso 1 de 2</span>
                 </div>
             </div>

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-import SelectPersonType from "./pages/SelectPersonType";  // ✅ IMPORTACIÓN CORRECTA
+import Home from "./pages/home";
+import SelectPersonType from "./pages/SelectPersonType";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import VerifyPhone from "./pages/VerifyPhone";
@@ -18,7 +19,7 @@ function App() {
       <Routes>
 
         {/* Paso 0: Selección de tipo de persona */}
-        <Route path="/" element={<SelectPersonType />} />
+        <Route path="/" element={<Home />} />
         <Route path="/select-person-type" element={<SelectPersonType />} />
 
         {/* Registro */}
