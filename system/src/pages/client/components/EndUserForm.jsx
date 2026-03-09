@@ -166,7 +166,7 @@ export default function EndUserForm({ onUserCreated }) {
                         </div>
                     </div>
 
-                    <button disabled={loading} className="w-full md:w-auto float-right bg-[#0c516e] text-white px-12 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-3 hover:bg-[#0a435c] transition-all shadow-lg shadow-blue-900/10">
+                    <button disabled={loading} className="w-full md:w-auto float-right bg-[#0c516e] text-white px-12 py-4 rounded-2xl font-normal text-sm flex items-center justify-center gap-3 hover:bg-[#0a435c] transition-all shadow-lg shadow-blue-900/10">
                         {loading ? <FaSpinner className="animate-spin" /> : <FaSearch />} VALIDAR IDENTIDAD
                     </button>
                 </form>
