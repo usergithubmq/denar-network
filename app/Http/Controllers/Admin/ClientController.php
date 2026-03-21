@@ -57,7 +57,7 @@ class ClientController extends Controller
 
                 // Calculamos el siguiente prefijo de cliente (027, 028, etc.)
                 // Si es el primero, empezamos en 27
-                $proximoId = (Cliente::max('id') ?? 0) + 27;
+                $proximoId = (Cliente::max('id') ?? 0) + 06;
                 $prefijoCliente = str_pad($proximoId, 3, '0', STR_PAD_LEFT);
 
                 // TRONCO (13 dígitos) para cobranza referenciada

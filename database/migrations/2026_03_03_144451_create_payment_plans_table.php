@@ -17,25 +17,19 @@ return new class extends Migration
             $table->string('referencia_contrato')->nullable();
 
             // Datos de Originación
-            $table->decimal('valor_total_vehiculo', 15, 2);
-            $table->decimal('enganche_pagado', 15, 2)->default(0);
-            $table->integer('meses_enganche')->default(1); // Nuevo campo
-            $table->decimal('comision_apertura', 15, 2)->default(0);
-            $table->decimal('cargo_gps', 10, 2)->default(0)->nullable();
-            $table->decimal('cargo_seguro', 10, 2)->default(0)->nullable();
-
-            $table->decimal('monto_final_financiado', 15, 2);
-            $table->integer('plazo_credito_meses'); // Nuevo
+            $table->decimal('credito', 15, 2)->nullable();
+            $table->integer('plazo_credito_meses')->nullable();
+            $table->decimal('enganche', 15, 2)->default(0);
 
             // Datos de la Mensualidad
-            $table->integer('numero_pago');
-            $table->integer('total_pagos');
-            $table->decimal('monto_normal', 15, 2);
-            $table->decimal('monto_pronto_pago', 15, 2);
+            $table->integer('numero_pago')->nullable();
+            $table->integer('total_pagos')->nullable();
+            $table->decimal('monto_normal', 15, 2)->nullable();
+            $table->decimal('moratoria', 15, 2)->nullable();
 
             // Fechas
-            $table->date('fecha_vencimiento');
-            $table->date('fecha_limite_habil');
+            $table->date('fecha_vencimiento')->nullable();
+            $table->date('fecha_limite_habil')->nullable();
 
             // Estado y Control de Pagos
             // ANTES TENÍA UN PUNTO (.), AHORA LA FLECHA (->) CORRECTA:

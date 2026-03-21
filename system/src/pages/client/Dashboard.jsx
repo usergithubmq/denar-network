@@ -93,7 +93,7 @@ export default function Dashboard() {
                         onClick={() => setVistaActual('profile')}
                         className={`w-full flex items-center gap-3 p-3 rounded-xl transition text-sm font-medium ${vistaActual === 'profile'
                             ? 'bg-white/10 border-l-4 border-teal-400 font-bold shadow-lg text-white'
-                            : 'hover:bg-white/5 text-slate-300'
+                            : 'hover:bg-white/5 text-white'
                             }`}
                     >
                         <FaUser className={vistaActual === 'profile' ? 'text-teal-400' : ''} />
@@ -103,7 +103,7 @@ export default function Dashboard() {
                         onClick={() => setVistaActual('pagadores')}
                         className={`w-full flex items-center gap-3 p-3 rounded-xl transition text-sm font-medium ${vistaActual === 'pagadores'
                             ? 'bg-white/10 border-l-4 border-teal-400 font-bold shadow-lg text-white'
-                            : 'hover:bg-white/5 text-slate-300'
+                            : 'hover:bg-white/5 text-white'
                             }`}
                     >
                         <FaUsers className={vistaActual === 'pagadores' ? 'text-teal-400' : ''} />
@@ -114,7 +114,7 @@ export default function Dashboard() {
                         onClick={() => setVistaActual('reporte')}
                         className={`w-full flex items-center gap-3 p-3 rounded-xl transition text-sm font-medium ${vistaActual === 'reporte'
                             ? 'bg-white/10 border-l-4 border-teal-400 font-bold shadow-lg text-white'
-                            : 'hover:bg-white/5 text-slate-300'
+                            : 'hover:bg-white/5 text-white'
                             }`}
                     >
                         <FaFileInvoiceDollar className={vistaActual === 'reporte' ? 'text-teal-400' : ''} />
@@ -131,7 +131,7 @@ export default function Dashboard() {
             <main className="flex-1 ml-72">
                 {vistaActual === 'pagadores' ? (
                     <>
-                        <header className="sticky top-0 z-50 flex items-center justify-between gap-4 px-6 py-4 bg-[#0c516e] backdrop-blur-md border-[#a8c6d4] shadow-sm mb-6">
+                        <header className="sticky top-0 z-50 flex items-center justify-between gap-4 px-6 py-4 bg-[#064760] backdrop-blur-md border-[#a8c6d4] shadow-sm mb-6">
                             <div className="flex flex-col gap-0.5">
                                 {/* Título y descripción unidos */}
                                 <div className="flex items-baseline">

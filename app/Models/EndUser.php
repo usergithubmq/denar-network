@@ -13,8 +13,6 @@ class EndUser extends Model
     protected $fillable = [
         'cliente_id',
         'user_id',
-        'name',
-        'email',
         'referencia_interna',
         'clabe_stp',
         'is_active',

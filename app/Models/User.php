@@ -47,6 +47,15 @@ class User extends Authenticatable
      */
     public function cliente()
     {
-        return $this->hasOne(Cliente::class);
+        // Esta es para que el Dashboard sepa a qué empresa pertenece el usuario logueado
+        return $this->hasOne(\App\Models\Cliente::class, 'user_id', 'id');
+    }
+
+    /**
+     * Un usuario (pagador) tiene un plan de pago.
+     */
+    public function paymentPlan()
+    {
+        return $this->hasOne(PaymentPlan::class, 'user_id', 'id');
     }
 }

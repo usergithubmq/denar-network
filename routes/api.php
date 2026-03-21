@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Controladores
+use App\Http\Controllers\Api\EnrolamientoController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\PhoneVerificationController;
@@ -22,13 +23,15 @@ use App\Http\Controllers\Stp\StpWebhookController;
 */
 
 // Webhook externo (Sin Auth)
-Route::post('/stp/webhook/abonos', [StpWebhookController::class, 'recibirAbono']);
+Route::post('/stp/webhook/abono', [StpWebhookController::class, 'recibirAbono']);
 
 // Autenticación
 Route::post('/login', [LoginController::class, 'login']);
 Route::post('/register', [RegisterController::class, 'register']);
 
 Route::middleware('auth:sanctum')->group(function () {
+
+    Route::post('/enrolar', [EnrolamientoController::class, 'registrar']);
 
     // 1. DASHBOARD SUPER ADMIN
     Route::prefix('admin')->group(function () {
@@ -59,6 +62,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/reporte-conciliacion', [ReporteController::class, 'reporteConciliacion']);
         Route::post('/plan-pago/generar', [PlanPagoController::class, 'generarPlan']);
         Route::get('/plan-pago/resumen/{clabe}', [PlanPagoController::class, 'obtenerResumen']);
+
+        Route::post('/consultar-pago', [PlanPagoController::class, 'obtenerResumen']);
     });
 
     // 3. ONBOARDING (Validaciones)

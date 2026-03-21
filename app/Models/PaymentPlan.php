@@ -15,42 +15,41 @@ class PaymentPlan extends Model
         'user_id',
         'cuenta_beneficiario',
         'referencia_contrato',
-        'valor_total_vehiculo',
-        'enganche_pagado',
-        'meses_enganche',
-        'comision_apertura',
-        'cargo_gps',
-        'cargo_seguro',
-        'monto_final_financiado',
+
+        'credito',
         'plazo_credito_meses',
+        'enganche',
+
         'numero_pago',
         'total_pagos',
         'monto_normal',
-        'monto_pronto_pago',
+        'moratoria',
+
         'fecha_vencimiento',
         'fecha_limite_habil',
+
         'estado',
         'monto_pagado_acumulado',
         'fecha_pago_real'
     ];
 
     protected $casts = [
-        'fecha_vencimiento'      => 'date',
-        'fecha_limite_habil'     => 'date',
-        'fecha_pago_real'        => 'datetime',
-        'valor_total_vehiculo'   => 'float',
-        'enganche_pagado'        => 'float',
-        'meses_enganche'         => 'integer',
-        'comision_apertura'      => 'float',
-        'cargo_gps'              => 'float',
-        'cargo_seguro'           => 'float',
-        'monto_final_financiado' => 'float',
+
+        'credito'   => 'float',
         'plazo_credito_meses'    => 'integer',
-        'monto_normal'           => 'float',
-        'monto_pronto_pago'      => 'float',
-        'monto_pagado_acumulado' => 'float',
+        'enganche'        => 'float',
+
         'numero_pago'            => 'integer',
         'total_pagos'            => 'integer',
+        'monto_normal'           => 'float',
+
+
+        'fecha_vencimiento'      => 'date',
+        'fecha_limite_habil'     => 'date',
+
+        'estado' => 'string',
+        'monto_pagado_acumulado' => 'float',
+        'fecha_pago_real'        => 'datetime',
     ];
 
     /**

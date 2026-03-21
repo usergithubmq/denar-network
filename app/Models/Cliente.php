@@ -16,6 +16,7 @@ class Cliente extends Model
         'rfc',
         'nombre_legal',
         'nombre_comercial',
+        'allowed_ip',
 
         'phone',
         'phone_verification_code',

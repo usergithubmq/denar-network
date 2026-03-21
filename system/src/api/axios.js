@@ -4,24 +4,29 @@ const baseURL = import.meta.env.MODE === 'production'
     ? 'https://app.koonfinansen.com.mx'
     : 'http://127.0.0.1:8000';
 
-// Instancia para autenticación (Sanctum)
-export const authApi = axios.create({
+// Configuración unificada para manejar credenciales y tokens automáticamente
+const axiosConfig = {
     baseURL: baseURL,
-    withCredentials: true,
-});
+    withCredentials: true,    // Indispensable para que las cookies viajen
+    withXSRFToken: true,      // Envía el token CSRF automáticamente
+    headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+    }
+};
 
-// Instancia para el resto de la API (con prefijo /api)
+// 1. Instancia para peticiones globales (úsala para /sanctum/csrf-cookie)
+export const authApi = axios.create(axiosConfig);
+
+// 2. Instancia para la API (con prefijo /api)
 const api = axios.create({
+    ...axiosConfig,
     baseURL: `${baseURL}/api`,
-    withCredentials: true,
 });
 
+// Interceptor para inyectar el Token Bearer si existe en localStorage
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem("token");
-    config.headers.Accept = "application/json";
-    if (!(config.data instanceof FormData)) {
-        config.headers["Content-Type"] = "application/json";
-    }
     if (token && token !== "undefined" && token !== "") {
         config.headers.Authorization = `Bearer ${token}`;
     }

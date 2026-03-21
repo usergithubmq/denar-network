@@ -14,95 +14,119 @@ class StpWebhookController extends Controller
 {
     public function recibirAbono(Request $request)
     {
-        // 1. Log de entrada (Vital para soporte con STP)
-        Log::info('STP_WEBHOOK_RAW_DATA:', $request->all());
+        // SEGURIDAD: Solo permitimos peticiones de nuestro propio servidor
+        $allowedIps = ['168.231.75.146', '127.0.0.1'];
+
+        if (!in_array($request->ip(), $allowedIps) && config('app.env') === 'production') {
+            Log::warning("ACCESO NO AUTORIZADO: Intento desde " . $request->ip());
+            return response()->json(['confirmacion' => 'error', 'causa' => 'Unauthorized'], 401);
+        }
+
+        Log::info('--- NUEVA PETICIÓN RECIBIDA ---');
+        Log::info('METODO: ' . $request->method());
+        Log::info('CONTENT_TYPE: ' . $request->header('Content-Type'));
+        Log::info('BODY_RAW: ' . $request->getContent());
+        Log::info('BODY_ARRAY:', $request->all());
+
+        // 1. Extracción y Log de entrada
+        $data = $request->json()->all();
+        if (empty($data)) {
+            $data = $request->all();
+        }
+
+        Log::info('STP_WEBHOOK_DATA_RECEIVED:', $data);
 
         try {
             // 2. Validación de CODI (Validación de cuenta operativa)
-            if ($request->institucionOrdenante == '90903' && $request->nombreOrdenante == 'CODI VALIDA') {
+            if (($data['institucionOrdenante'] ?? '') == '90903' && ($data['nombreOrdenante'] ?? '') == 'CODI VALIDA') {
                 Log::info('STP_CODI_VALIDATION_SUCCESS');
                 return response()->json(['confirmacion' => 'success'], 200);
             }
 
-            // 3. Verificación de duplicados (No procesar dos veces la misma Clave de Rastreo)
-            $existe = StpAbono::where('clave_rastreo', $request->claveRastreo)
-                ->where('fecha_operacion', $request->fechaOperacion)
+            // 3. Verificación de duplicados
+            $existe = StpAbono::where('clave_rastreo', $data['claveRastreo'] ?? '')
+                ->where('fecha_operacion', $data['fechaOperacion'] ?? '')
                 ->exists();
+
             if ($existe) {
-                Log::warning("STP_DUPLICADO_IGNORADO: {$request->claveRastreo}");
+                Log::warning("STP_DUPLICADO_IGNORADO: " . ($data['claveRastreo'] ?? 'SIN_CLAVE'));
                 return response()->json(['confirmacion' => 'success'], 200);
             }
+            Log::info('DEBUG_ID_VAL:', ['id' => $data['id'] ?? 'NO_HAY_ID']);
+            Log::info('DEBUG_FULL_DATA:', $data);
 
-            // 4. Guardado con Mapeo (CamelCase de STP -> snake_case de DB)
-            DB::transaction(function () use ($request) {
+            // 4. Guardado con Mapeo y Transacción
+            DB::transaction(function () use ($data) {
                 StpAbono::create([
-                    'stp_id'                 => $request->id,
-                    'fecha_operacion'        => $request->fechaOperacion,
-                    'institucion_ordenante'  => $request->institucionOrdenante,
-                    'institucion_beneficiaria' => $request->institucionBeneficiaria,
-                    'clave_rastreo'          => $request->claveRastreo,
-                    'monto'                  => $request->monto,
-                    'nombre_ordenante'       => $request->nombreOrdenante,
-                    'tipo_cuenta_ordenante'  => $request->tipoCuentaOrdenante,
-                    'cuenta_ordenante'       => $request->cuentaOrdenante,
-                    'rfc_curp_ordenante'     => $request->rfcCurpOrdenante,
-                    'nombre_beneficiario'    => $request->nombreBeneficiario,
-                    'tipo_cuenta_beneficiario' => $request->tipoCuentaBeneficiario,
-                    'cuenta_beneficiario'    => $request->cuentaBeneficiario,
-                    'rfc_curp_beneficiario'  => $request->rfcCurpBeneficiario,
-                    'nombre_beneficiario2'   => $request->nombreBeneficiario2,
-                    'tipo_cuenta_beneficiario2' => $request->tipoCuentaBeneficiario2,
-                    'cuenta_beneficiario2'   => $request->cuentaBeneficiario2,
-                    'concepto_pago'          => $request->conceptoPago,
-                    'referencia_numerica'    => $request->referenciaNumerica,
-                    'empresa'                => $request->empresa,
-                    'tipo_pago'              => $request->tipoPago,
-                    'ts_liquidacion'         => $request->tsLiquidacion,
-                    'folio_codi'             => $request->folioCodi,
+                    'stp_id'                    => $data['id'] ?? null,
+                    'fecha_operacion'           => $data['fechaOperacion'] ?? null,
+                    'institucion_ordenante'     => $data['institucionOrdenante'] ?? null,
+                    'institucion_beneficiaria'  => $data['institucionBeneficiaria'] ?? null,
+                    'clave_rastreo'             => $data['claveRastreo'] ?? null,
+                    'monto'                     => $data['monto'] ?? 0,
+                    'nombre_ordenante'          => $data['nombreOrdenante'] ?? 'ND',
+                    'tipo_cuenta_ordenante'     => $data['tipoCuentaOrdenante'] ?? null,
+                    'cuenta_ordenante'          => $data['cuentaOrdenante'] ?? null,
+                    'rfc_curp_ordenante'        => $data['rfcCurpOrdenante'] ?? 'ND',
+                    'nombre_beneficiario'       => $data['nombreBeneficiario'] ?? 'ND',
+                    'tipo_cuenta_beneficiario'  => $data['tipoCuentaBeneficiario'] ?? null,
+                    'cuenta_beneficiario'       => $data['cuentaBeneficiario'] ?? null,
+                    'rfc_curp_beneficiario'     => $data['rfcCurpBeneficiario'] ?? 'ND',
+                    'nombre_beneficiario2'      => $data['nombreBeneficiario2'] ?? 'ND',
+                    'tipo_cuenta_beneficiario2' => $data['tipoCuentaBeneficiario2'] ?? null,
+                    'cuenta_beneficiario2'      => $data['cuentaBeneficiario2'] ?? null,
+                    'concepto_pago'             => $data['conceptoPago'] ?? 'ND',
+                    'referencia_numerica'       => $data['referenciaNumerica'] ?? 0,
+                    'empresa'                   => $data['empresa'] ?? 'ND',
+                    'tipo_pago'                 => $data['tipoPago'] ?? 1,
+                    'ts_liquidacion'            => $data['tsLiquidacion'] ?? '0',
+                    'folio_codi'                => $data['folioCodi'] ?? null,
                 ]);
 
-                $this->aplicarPagoAlPlan($request->cuentaBeneficiario, $request->monto);
+                $this->aplicarPagoAlPlan($data['cuentaBeneficiario'] ?? '', $data['monto'] ?? 0);
             });
 
-            // 5. RESPUESTA RÁPIDA (STP solo tiene 2500ms)
             return response()->json(['confirmacion' => 'success'], 200);
         } catch (\Exception $e) {
-            // ESTO NOS DIRÁ EL ERROR REAL EN LA TERMINAL
-            Log::error('STP_ERROR: ' . $e->getMessage());
+            Log::error('STP_ERROR: ' . $e->getMessage(), [
+                'line' => $e->getLine(),
+                'file' => $e->getFile()
+            ]);
+
             return response()->json([
                 'confirmacion' => 'error',
-                'causa' => $e->getMessage(), // <--- Esto te dirá qué falta
-                'line' => $e->getLine()
+                'causa' => $e->getMessage()
             ], 500);
         }
     }
 
     private function aplicarPagoAlPlan($clabe, $montoRecibido)
     {
-        // 1. Buscamos la mensualidad más antigua que esté pendiente
-        $plan = PaymentPlan::where('cuenta_beneficiario', $clabe)
-            ->where('estado', 'pendiente')
-            ->orderBy('numero_pago', 'asc')
-            ->first();
+        if (empty($clabe)) return;
+
+        // Buscamos el plan solo por CLABE para asegurar que lo encuentre
+        $plan = PaymentPlan::where('cuenta_beneficiario', $clabe)->first();
 
         if ($plan) {
-            $hoy = Carbon::now();
-            $fechaLimite = Carbon::parse($plan->fecha_limite_habil);
+            $montoRecibido = (float) $montoRecibido;
 
-            // 2. Determinamos monto esperado según tu regla de fecha hábil
-            $esProntoPago = $hoy->lte($fechaLimite);
-            $montoEsperado = $esProntoPago ? $plan->monto_pronto_pago : $plan->monto_normal;
+            // Sumamos al acumulado que ya existe en la DB
+            $nuevoAcumulado = (float)$plan->monto_pagado_acumulado + $montoRecibido;
 
-            // 3. Si el dinero cubre la deuda, marcamos como pagado
-            if ($montoRecibido >= ($montoEsperado - 1)) {
-                $plan->update([
-                    'estado' => 'pagado',
-                    'updated_at' => $hoy
-                ]);
-                Log::info("PLAN_PAGO_LIQUIDADO: Pago #{$plan->numero_pago} de la CLABE {$clabe}");
-            } else {
-                Log::warning("PLAN_PAGO_INSUFICIENTE: Mandó {$montoRecibido} pero se esperaba {$montoEsperado}");
-            }
+            // Determinamos el estado: 
+            // Si lo que ha pagado ya cubre el Crédito + la Moratoria, lo marcamos como pagado.
+            $deudaTotal = (float)$plan->credito + (float)$plan->moratoria;
+            $nuevoEstado = ($nuevoAcumulado >= ($deudaTotal - 0.01)) ? 'pagado' : 'parcial';
+
+            $plan->update([
+                'monto_pagado_acumulado' => $nuevoAcumulado,
+                'estado'                 => $nuevoEstado,
+                'fecha_pago_real'        => now(),
+            ]);
+
+            Log::info("KoonSystem - PAGO_EXITOSO: CLABE {$clabe} acumuló {$nuevoAcumulado}. Estado: {$nuevoEstado}");
+        } else {
+            Log::warning("KoonSystem - ERROR: Se recibió pago de {$montoRecibido} para CLABE {$clabe} pero la CLABE no existe en payment_plans.");
         }
     }
 }

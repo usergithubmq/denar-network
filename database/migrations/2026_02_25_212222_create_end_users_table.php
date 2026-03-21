@@ -13,10 +13,6 @@ return new class extends Migration {
             $table->foreignId('cliente_id')->constrained('clientes')->onDelete('cascade');
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
 
-            // Datos del pagador final (cliente de tu cliente)
-            $table->string('name');
-            $table->string('email')->nullable();
-
             // Motor STP
             $table->string('clabe_stp', 18)->unique()->index();
             $table->string('referencia_interna')->nullable(); // Ej: Contrato #

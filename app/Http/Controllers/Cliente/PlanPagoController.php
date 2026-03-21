@@ -10,89 +10,73 @@ use Illuminate\Support\Facades\Log;
 
 class PlanPagoController extends Controller
 {
+
     public function generarPlan(Request $request)
     {
-        // 1. Validamos incluyendo los campos nuevos y opcionales
-        $validated = $request->validate([
-            'user_id'               => 'required|integer',
-            'clabe'                 => 'required|string',
-            'monto_total'           => 'required|numeric',
-            'valor_total_vehiculo'  => 'required|numeric',
-            'enganche_pagado'       => 'required|numeric',
-            'meses_enganche'        => 'required|integer', // Nuevo requerido
-            'comision_apertura'     => 'required|numeric',
-            'plazo_meses'           => 'required|integer',
-            'dia_pago'              => 'required|integer|min:1|max:28',
-            'descuento_pronto_pago' => 'required|numeric',
-            'cargo_gps'             => 'nullable|numeric',
-            'cargo_seguro'          => 'nullable|numeric',
+        $request->validate([
+            'user_id'             => 'required|exists:users,id',
+            'cuenta_beneficiario' => 'required|string',
+            'monto_normal'        => 'required|numeric',
+            'moratoria'           => 'required|numeric',
         ]);
 
-        // 2. Procesar valores opcionales
-        $gps    = $request->input('cargo_gps', 0);
-        $seguro = $request->input('cargo_seguro', 0);
+        try {
+            $plan = \App\Models\PaymentPlan::create([
+                'user_id'             => $request->user_id,
+                'cuenta_beneficiario' => $request->cuenta_beneficiario,
+                'referencia_contrato' => $request->referencia_contrato,
 
-        // 3. Cálculos financieros
-        $montoCapital = $request->monto_total / $request->plazo_meses;
-        $totalMensual = $montoCapital + $gps + $seguro;
+                // Solo almacenamos lo que nos interesa de la mensualidad
+                'monto_normal'        => $request->monto_normal,
+                'moratoria'           => $request->moratoria,
 
-        $planesGenerados = [];
+                // Opcional: puedes dejar las fechas automáticas o quitarlas 
+                // ya que ahora son nullable, pero es mejor tener una referencia
+                'fecha_vencimiento'   => now()->addDays(30)->format('Y-m-d'),
+                'fecha_limite_habil'  => now()->addDays(35)->format('Y-m-d'),
 
-        for ($i = 1; $i <= $request->plazo_meses; $i++) {
-            $fechaNatural = Carbon::now()->addMonths($i - 1)->setDay($request->dia_pago);
-
-            $fechaHabil = clone $fechaNatural;
-            if ($fechaHabil->isWeekend()) {
-                $fechaHabil = $fechaHabil->next(Carbon::MONDAY);
-            }
-
-            $plan = PaymentPlan::create([
-                'user_id'                => $request->user_id,
-                'cuenta_beneficiario'    => $request->clabe,
-                'numero_pago'            => $i,
-                'total_pagos'            => $request->plazo_meses,
-                'valor_total_vehiculo'   => $request->valor_total_vehiculo,
-                'enganche_pagado'        => $request->enganche_pagado,
-                'meses_enganche'         => $request->meses_enganche, // Nuevo guardado
-                'comision_apertura'      => $request->comision_apertura,
-                'monto_final_financiado' => $request->monto_total,
-                'plazo_credito_meses'    => $request->plazo_meses,    // Nuevo guardado
-                'cargo_gps'              => $gps,
-                'cargo_seguro'           => $seguro,
-                'monto_normal'           => $totalMensual,
-                'monto_pronto_pago'      => $totalMensual - $request->descuento_pronto_pago,
-                'fecha_vencimiento'      => $fechaNatural->format('Y-m-d'),
-                'fecha_limite_habil'     => $fechaHabil->format('Y-m-d'),
-                'estado'                 => 'pendiente',
+                'estado'              => $request->estado ?? 'pendiente',
             ]);
 
-            $planesGenerados[] = $plan;
+            return response()->json([
+                'success' => true,
+                'message' => 'Plan de pago generado con éxito',
+                'plan'    => $plan
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error en DB: ' . $e->getMessage()], 500);
         }
-
-        return response()->json([
-            'status' => 'success',
-            'message' => "Plan de {$request->plazo_meses} meses generado con éxito.",
-            'data' => $planesGenerados
-        ]);
     }
 
-    public function obtenerResumen($clabe)
-    {
-        $proximo = PaymentPlan::where('cuenta_beneficiario', $clabe)
-            ->where('estado', 'pendiente')
-            ->orderBy('numero_pago', 'asc')
-            ->first();
 
-        $totales = PaymentPlan::where('cuenta_beneficiario', $clabe)->count();
-        $pagados = PaymentPlan::where('cuenta_beneficiario', $clabe)->where('estado', 'pagado')->count();
+    // En PlanPagoController.php
+    public function obtenerResumen(Request $request)
+    {
+        $clabe = $request->cuenta_beneficiario;
+        $plan = \App\Models\PaymentPlan::where('cuenta_beneficiario', $clabe)->first();
+
+        if (!$plan) {
+            return response()->json(['data' => null], 404);
+        }
+
+        // Usamos los nombres de tu modelo PaymentPlan
+        $acumulado = (float)($plan->monto_pagado_acumulado ?? 0);
+        $credito   = (float)($plan->credito ?? 0);
+        $moratoria = (float)($plan->moratoria ?? 0);
+
+        // Saldo Total = (Lo que falta de crédito) + moratoria
+        $saldoTotal = ($credito - $acumulado) + $moratoria;
+
+        // Progreso
+        $progreso = ($credito > 0) ? round(($acumulado / $credito) * 100) : 0;
 
         return response()->json([
-            'proximo_pago' => $proximo,
-            'stats' => [
-                'total_meses' => $totales,
-                'meses_pagados' => $pagados,
-                'progreso_porcentaje' => $totales > 0 ? round(($pagados / $totales) * 100) : 0,
-                'restante' => $totales - $pagados
+            'data' => [
+                'monto_acumulado' => $acumulado, // <--- ANTES DECÍA 'abonado', POR ESO FALLABA
+                'moratoria'       => $moratoria,
+                'saldo_total'     => $saldoTotal, // <--- ANTES DECÍA 'total_a_pagar'
+                'progreso'        => $progreso,
+                'referencia'      => $plan->referencia_contrato ?? 'S/R'
             ]
         ]);
     }
