@@ -37,4 +37,11 @@ class LoginController extends Controller
             ]
         ]);
     }
+    public function logout(Request $request)
+    {
+        // Elimina el token actual de la base de datos
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json(['message' => 'Token eliminado, sesión cerrada']);
+    }
 }

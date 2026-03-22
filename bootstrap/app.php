@@ -12,21 +12,18 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // 1. Indispensable para que las cookies de sesión funcionen entre React y Laravel
+        $middleware->statefulApi();
 
-        // AGREGA ESTA LÍNEA AQUÍ ABAJO:
-        $middleware->trustProxies(at: '*');
+        // 2. Solo dejamos excepciones para servicios externos (Webhooks)
+        // QUITAMOS 'login', 'register', 'api/*', etc.
+        $middleware->validateCsrfTokens(except: [
+            'api/stp/webhook/abono',
+        ]);
 
         $middleware->alias([
             'whitelist' => \App\Http\Middleware\CheckIpWhitelist::class,
             'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
-        ]);
-
-        $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-        ]);
-
-        $middleware->validateCsrfTokens(except: [
-            'api/stp/webhook/abono',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {})->create();

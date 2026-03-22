@@ -2,7 +2,7 @@ import axios from "axios";
 
 const baseURL = import.meta.env.MODE === 'production'
     ? 'https://app.koonfinansen.com.mx'
-    : 'http://127.0.0.1:8000';
+    : 'http://localhost:8000';
 
 // Configuración unificada para manejar credenciales y tokens automáticamente
 const axiosConfig = {

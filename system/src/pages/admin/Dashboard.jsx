@@ -66,10 +66,6 @@ export default function Dashboard() {
                 <header className="flex justify-between items-center mb-10 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
                     <div>
                         <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.3em]">Módulo Administrativo</h2>
-                        <div className="flex items-center gap-2 mt-1">
-                            <FaShieldAlt className="text-[#0c516e]" />
-                            <span className="text-xl font-bold text-slate-800">Milton Quiroz</span>
-                        </div>
                     </div>
                     <div className="bg-teal-50 text-teal-700 px-4 py-2 rounded-full text-xs font-bold border border-teal-100 uppercase tracking-widest">
                         Sesión Activa
