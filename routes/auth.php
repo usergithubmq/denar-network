@@ -12,17 +12,14 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// Rutas para invitados (Guest)
-Route::middleware('guest')->group(function () {
-    // Login
-    Route::post('/login', [LoginController::class, 'login'])
-        ->name('login');
+// 1. Login SIN middleware 'guest' para evitar el Redireccionamiento (302)
+Route::post('/login', [LoginController::class, 'login'])->name('login');
 
-    // Registro
+// 2. Rutas para invitados reales (Registro y Recuperación)
+Route::middleware('guest')->group(function () {
     Route::post('/register', [RegisterController::class, 'register'])
         ->name('register');
 
-    // Recuperación de contraseña
     Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])
         ->name('password.email');
 
@@ -30,7 +27,7 @@ Route::middleware('guest')->group(function () {
         ->name('password.store');
 });
 
-// Rutas que requieren estar logueado
+// 3. Rutas que requieren estar logueado (Sanctum)
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])
         ->name('logout');
