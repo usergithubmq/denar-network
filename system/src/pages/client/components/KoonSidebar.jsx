@@ -38,7 +38,7 @@ const KoonSidebar = ({ vistaActual, setVistaActual, clienteInfo, handleLogout, g
     };
 
     return (
-        <aside className="w-64 bg-[#0c516e] hidden md:flex flex-col text-white shadow-[10px_0_50px_rgba(0,0,0,0.2)] fixed h-full z-50 border-r border-white/5">
+        <aside className="w-64 bg-[#051d26] hidden md:flex flex-col text-white shadow-[10px_0_50px_rgba(0,0,0,0.2)] fixed h-full z-50 border-r border-white/5">
             {/* --- LOGO AREA CON REFLEJO --- */}
             <div className="p-8 mb-4 relative overflow-hidden">
                 <div className="relative z-10">

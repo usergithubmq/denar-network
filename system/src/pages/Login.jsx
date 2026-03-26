@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { authApi } from "../api/axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaLock, FaEnvelope, FaEye, FaEyeSlash, FaShieldAlt } from "react-icons/fa";
+import logo from '../assets/kf3d.png'
 
 export default function Login() {
     const [email, setEmail] = useState("");
@@ -26,8 +27,21 @@ export default function Login() {
                 localStorage.setItem("token", token);
                 localStorage.setItem("user", JSON.stringify(user));
                 localStorage.setItem("role", user.role);
-                navigate(user.role === "admin" ? "/admin/dashboard" : "/client/dashboard");
+
+                // NUEVA LÓGICA DE REDIRECCIÓN POR ROL
+                if (user.role === "admin") {
+                    navigate("/admin/dashboard");
+                } else if (user.role === "cliente") {
+                    navigate("/client/dashboard");
+                } else if (user.role === "cliente_final") {
+                    // 👈 Aquí es donde sucede la magia para el usuario de la App/Agencia
+                    navigate("/my/dashboard");
+                } else {
+                    // Por si acaso cae un rol no definido
+                    navigate("/login");
+                }
             }
+
         } catch (err) {
             setError("Credenciales no válidas. Intente de nuevo.");
             console.error("Error en login:", err);
@@ -60,16 +74,25 @@ export default function Login() {
                             initial={{ x: -20, opacity: 0 }}
                             animate={{ x: 0, opacity: 1 }}
                             transition={{ delay: 0.3 }}
-                            className="text-2xl font-normal tracking-tighter mb-1"
+                            className="text-1xl font-normal tracking-tighter mb-1"
                         >
                             KOON<span className="text-teal-400">SYSTEM</span>
                         </motion.h1>
                         <div className="h-1 w-12 bg-teal-400 rounded-full" />
                     </div>
-
+                    <div className="relative h-32 w-full flex justify-center items-center">
+                        {/* 1. El contenedor padre DEBE tener una altura definida (ej. h-32) 
+          para que el resto del contenido sepa dónde empezar.
+    */}
+                        <img
+                            src={logo}
+                            alt="Koon System"
+                            className="absolute h-[480%] w-auto max-w-none object-contain opacity-90 pointer-events-none"
+                        />
+                    </div>
                     <div className="relative z-10">
-                        <h2 className="text-5xl font-bold leading-tight mb-6">Seguridad <br /> en cada <br /> transacción.</h2>
-                        <p className="text-cyan-100 text-lg font-light max-w-xs leading-relaxed">
+                        <h2 className="text-3xl font-normal leading-tight mb-6">Seguridad en cada transacción.</h2>
+                        <p className="text-cyan-100  font-light max-w-xs leading-relaxed">
                             Panel de control inteligente para la gestión de activos y cuentas CLABE.
                         </p>
                     </div>

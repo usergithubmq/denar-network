@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import {
     FaSearch, FaSpinner, FaCalculator, FaCheckCircle, FaUserShield,
-    FaIdCard, FaEnvelope, FaHashtag, FaMapMarkerAlt, FaMoneyBillWave,
-    FaBuilding, FaFileInvoice, FaHistory
+    FaIdCard, FaEnvelope, FaHashtag, FaMoneyBillWave,
+    FaBuilding
 } from "react-icons/fa";
 import api, { authApi } from "../../../api/axios";
 
@@ -27,14 +27,13 @@ export default function EndUserForm({ onUserCreated }) {
     const [step, setStep] = useState(1);
     const [tempData, setTempData] = useState(null);
     const [formData, setFormData] = useState({
-        document_value: "", // Ahora será el RFC
+        document_value: "",
         email: "",
         referencia_interna: "",
         monto_normal: 0,
         moratoria: 0,
     });
 
-    // Regex para RFC (Persona Física y Moral)
     const rfcRegex = /^([A-ZÑ&]{3,4}) ?(?:- ?)?(\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])) ?(?:- ?)?([A-Z\d]{2})([A\d])$/;
 
     const handleValidate = async (e) => {
@@ -43,47 +42,39 @@ export default function EndUserForm({ onUserCreated }) {
         try {
             await authApi.get('/sanctum/csrf-cookie', { withCredentials: true });
             const res = await api.post("/client/validate-pagador", {
-                type: "RFC", // Cambiado de CURP a RFC
+                type: "RFC",
                 value: formData.document_value
             });
 
-            // Estructura según el JSON de Nubarium SAT que pasaste
+            // Recibe la data normalizada de tu nuevo controlador
             setTempData(res.data.data);
             setStep(2);
         } catch (err) {
-            if (err.response?.status === 422) {
-                // Esto te dirá: "El correo electrónico ya ha sido registrado."
-                const validationErrors = err.response.data.errors;
-                const firstMessage = Object.values(validationErrors)[0][0];
-                alert("Validación: " + firstMessage);
-            } else {
-                alert("Error: " + (err.response?.data?.message || "Error al procesar"));
-            }
+            const msg = err.response?.data?.message || "Error al validar RFC con el SAT";
+            alert("Validación: " + msg);
         } finally { setLoading(false); }
     };
 
     const handleConfirmAndCreate = async () => {
         setLoading(true);
         try {
-            const idData = tempData?.datosIdentificacion;
-
             // 1. Crear el Pagador (EndUser)
+            // Usamos el nombre que normalizamos en el controlador
             const res = await api.post("/client/end-users", {
-                name: idData?.nombres || tempData?.nombre_o_razon_social || "Usuario",
-                first_last: idData?.apellidoPaterno || "",
-                second_last: idData?.apellidoMaterno || "",
+                name: tempData?.nombre_o_razon_social || "Usuario Nuevo",
+                first_last: "", // El endpoint de razón social no separa apellidos
+                second_last: "",
                 email: formData.email,
-                referencia_interna: formData.referencia_interna, // <--- SE ENVÍA TU REFERENCIA REAL
+                referencia_interna: formData.referencia_interna,
                 document_value: formData.document_value // RFC
             });
 
-            // IMPORTANTE: Laravel devuelve la data en res.data.data (según el último controlador)
             const newPagador = res.data.data;
 
-            // 2. Generar el Plan de Pago usando los IDs reales que devolvió el servidor
+            // 2. Generar el Plan de Pago
             await api.post("/client/plan-pago/generar", {
-                user_id: newPagador.user_id, // El ID del usuario recién creado
-                cuenta_beneficiario: newPagador.clabe_stp, // La CLABE generada
+                user_id: newPagador.user_id,
+                cuenta_beneficiario: newPagador.clabe_stp,
                 referencia_contrato: formData.referencia_interna,
                 monto_normal: Number(formData.monto_normal),
                 moratoria: Number(formData.moratoria),
@@ -94,8 +85,7 @@ export default function EndUserForm({ onUserCreated }) {
             resetForm();
             if (onUserCreated) onUserCreated();
         } catch (err) {
-            console.error("Error completo:", err.response?.data);
-            alert("Error: " + (err.response?.data?.error || "Error al procesar"));
+            alert("Error: " + (err.response?.data?.error || "Error al procesar el registro"));
         } finally { setLoading(false); }
     };
 
@@ -153,36 +143,37 @@ export default function EndUserForm({ onUserCreated }) {
                     </div>
 
                     <button disabled={loading} className="w-full md:w-auto float-right bg-[#0c516e] text-white px-12 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-3 hover:bg-[#0a435c] transition-all shadow-lg">
-                        {loading ? <FaSpinner className="animate-spin" /> : <FaSearch />} CONSULTAR NUBARIUM SAT
+                        {loading ? <FaSpinner className="animate-spin" /> : <FaSearch />} CONSULTAR RFC EN SAT
                     </button>
                 </form>
             ) : (
                 <div className="animate-in slide-in-from-right-4 duration-300">
-                    {/* Header Enriquecido con datos de Nubarium */}
+                    {/* Header de Validación - Paso 2 */}
                     <div className="bg-gradient-to-r from-[#0c516e] to-[#146c91] p-6 rounded-[1.5rem] mb-8 text-white shadow-xl relative overflow-hidden">
                         <div className="flex items-center gap-5 relative z-10 mb-6">
                             <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30">
                                 <FaCheckCircle className="text-teal-300" size={30} />
                             </div>
                             <div>
-                                <p className="text-teal-300 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Estatus SAT: {tempData?.datosIdentificacion?.situacionContribuyente || 'OK'}</p>
-                                <h4 className="text-xl font-black">
-                                    {tempData?.datosIdentificacion?.nombres} {tempData?.datosIdentificacion?.apellidoPaterno} {tempData?.datosIdentificacion?.apellidoMaterno}
+                                <p className="text-teal-300 text-[10px] font-black uppercase tracking-[0.2em] mb-1">
+                                    Estatus SAT: {tempData?.datosIdentificacion?.situacionContribuyente || 'VALIDADO'}
+                                </p>
+                                {/* AQUÍ ESTÁ EL CAMBIO: Leemos directo del objeto normalizado */}
+                                <h4 className="text-xl font-black uppercase">
+                                    {tempData?.nombre_o_razon_social || "Cargando nombre..."}
                                 </h4>
-                                <p className="text-[10px] opacity-70 font-mono">{tempData?.rfc} | CIF: {tempData?.cif}</p>
+                                <p className="text-[10px] opacity-70 font-mono tracking-widest">
+                                    RFC: {tempData?.rfc || "Cargando RFC..."}
+                                </p>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/10 pt-4 relative z-10">
+                        <div className="border-t border-white/10 pt-4 relative z-10">
                             <div className="text-[10px] font-bold text-teal-200 uppercase flex items-center gap-2">
-                                <FaMapMarkerAlt /> {tempData?.datosUbicacion?.colonia}, {tempData?.datosUbicacion?.municipioDelegacion}, CP {tempData?.datosUbicacion?.cp}
-                            </div>
-                            <div className="text-[10px] font-bold text-teal-200 uppercase flex items-center gap-2">
-                                <FaBuilding /> RÉGIMEN: {tempData?.caracteristicasFiscales?.[0]?.regimen || 'GENERAL'}
+                                <FaBuilding /> Registro localizado exitosamente en el Padrón de Contribuyentes.
                             </div>
                         </div>
                     </div>
 
-                    {/* CONFIGURACIÓN FINANCIERA */}
                     <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 mb-8">
                         <h5 className="text-[#0c516e] font-black text-xs mb-6 uppercase flex items-center gap-2 tracking-widest">
                             <FaCalculator className="text-teal-500" /> Configuración de Pagos

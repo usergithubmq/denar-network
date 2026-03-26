@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 
+use App\Mail\BienvenidoPagadorMail;
+use Illuminate\Support\Facades\Mail;
+
 class EndUserController extends Controller
 {
     public function index()
@@ -63,45 +66,39 @@ class EndUserController extends Controller
 
             $rfc = strtoupper(trim($request->value));
 
-            // BYPASS PARA DESARROLLO LOCAL
-            if (env('APP_ENV') === 'local') {
-                return response()->json([
-                    'success' => true,
-                    'status'  => 200,
-                    'data'    => [
-                        'rfc' => $rfc,
-                        'datosIdentificacion' => [
-                            'nombres' => 'USUARIO PRUEBA ' . rand(1, 99),
-                            'apellidoPaterno' => 'KOON',
-                            'apellidoMaterno' => 'SYSTEM',
-                            'curp' => 'MOCK' . rand(1000, 9999) . 'HDF' . rand(10, 99)
-                        ],
-                        'datosUbicacion' => [
-                            'cp' => '06000',
-                            'entidadFederativa' => 'CIUDAD DE MÉXICO',
-                            'municipioDelegacion' => 'CUAUHTÉMOC'
-                        ]
-                    ]
-                ], 200);
-            }
-
-            // LLAMADA REAL A NUBARIUM
+            // LLAMADA REAL DIRECTA A NUBARIUM (Sin Bypass)
             $response = Http::withHeaders([
                 'Authorization' => 'Basic ' . base64_encode($user . ':' . $pass),
                 'Accept'        => 'application/json',
-            ])->post('https://api.nubarium.com/sat/v1/consultar_cif', [
-                'rfc'  => $rfc,
-                'tipo' => 'datos'
+            ])->post('https://sat.nubarium.com/sat/v1/obtener-razonsocial', [
+                'rfc'  => $rfc
             ]);
 
+            $res = $response->json();
+
+            // Si el estatus de Nubarium no es OK o no hay nombre, devolvemos error 422
+            if (($res['estatus'] ?? '') !== 'OK' || !isset($res['nombre'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El RFC no fue localizado en la base de datos del SAT'
+                ], 422);
+            }
+
+            // Retornamos la data real mapeada para tu React
             return response()->json([
-                'success' => $response->successful(),
-                'status'  => $response->status(),
-                'data'    => $response->json()
-            ], $response->status());
+                'success' => true,
+                'data'    => [
+                    'rfc' => $res['rfc'],
+                    'nombre_o_razon_social' => $res['nombre'],
+                    'datosIdentificacion' => [
+                        'nombres' => $res['nombre'],
+                        'situacionContribuyente' => 'VALIDADO'
+                    ]
+                ]
+            ], 200);
         } catch (\Exception $e) {
             Log::error("Error en validatePagador: " . $e->getMessage());
-            return response()->json(['success' => false, 'error' => 'Error de conexión'], 500);
+            return response()->json(['success' => false, 'error' => 'Error de comunicación con el servicio SAT'], 500);
         }
     }
 
@@ -111,13 +108,14 @@ class EndUserController extends Controller
         $cliente = $user->cliente;
 
         try {
-            return DB::transaction(function () use ($request, $cliente) {
-                // A. Crear Usuario con lo que viene del Form
+            // Ejecutamos la creación en DB
+            $resultado = DB::transaction(function () use ($request, $cliente) {
+                // A. Crear Usuario
                 $nuevoUsuario = User::create([
                     'name'       => $request->name,
-                    'first_last' => $request->first_last,
+                    'first_last' => $request->first_last ?? '',
                     'email'      => $request->email,
-                    'password'   => Hash::make($request->document_value),
+                    'password'   => Hash::make($request->document_value), // RFC como pass
                     'role'       => 'cliente_final',
                     'rfc'        => strtoupper($request->document_value),
                 ]);
@@ -128,22 +126,36 @@ class EndUserController extends Controller
                 $clabe17 = $tronco . $consecutivo;
                 $clabeCompleta = $clabe17 . $this->calcularDigitoVerificador($clabe17);
 
-                // C. Crear EndUser con TU REFERENCIA
+                // C. Crear EndUser (Contrato)
                 $contrato = EndUser::create([
                     'cliente_id'         => $cliente->id,
                     'user_id'            => $nuevoUsuario->id,
                     'clabe_stp'          => $clabeCompleta,
-                    'referencia_interna' => $request->referencia_interna, // <--- AQUÍ SE GUARDA TU DATO REAL
+                    'referencia_interna' => $request->referencia_interna,
                     'is_active'          => true,
                 ]);
 
-                // Devolvemos el objeto para que React lo reciba
-                return response()->json([
-                    'success' => true,
-                    'data'    => $contrato
-                ], 201);
+                // Retornamos ambos para usarlos en el correo
+                return ['usuario' => $nuevoUsuario, 'contrato' => $contrato];
             });
+
+            // --- D. ENVÍO DE EMAIL DE BIENVENIDA (BREVO) ---
+            try {
+                // Le pasamos el objeto usuario y el objeto cliente (la empresa)
+                Mail::to($resultado['usuario']->email)
+                    ->send(new BienvenidoPagadorMail($resultado['usuario'], $cliente));
+            } catch (\Exception $e) {
+                // Logueamos si el correo falló, pero no lanzamos error al front 
+                // porque el usuario YA fue creado exitosamente arriba.
+                Log::error("Error enviando correo de bienvenida: " . $e->getMessage());
+            }
+
+            return response()->json([
+                'success' => true,
+                'data'    => $resultado['contrato']
+            ], 201);
         } catch (\Exception $e) {
+            Log::error("Error en store EndUser: " . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }

@@ -10,6 +10,9 @@ import VerifyPhone from "./pages/VerifyPhone";
 import AdminDashboard from "./pages/admin/Dashboard"; // 'admin' en minúsculas según tu captura
 import ClientDashboard from "./pages/client/Dashboard"; // 'Client' con C mayúscula según tu captura
 
+import DashboardEndUser from "./pages/end_user/Dashboard";
+// import HistoryEndUser from "./pages/end_user/History"; // Si ya lo tienes creado
+
 import Conciliacion from "./pages/client/Conciliacion";
 
 // Onboarding
@@ -22,6 +25,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
+
         <Route path="/select-person-type" element={<SelectPersonType />} />
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
@@ -29,8 +33,12 @@ function App() {
 
         {/* Dashboards */}
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
+
         <Route path="/client/dashboard" element={<ClientDashboard />} />
         <Route path="/client/conciliacion" element={<Conciliacion />} />
+
+        <Route path="/my/dashboard" element={<DashboardEndUser />} />
+        {/* <Route path="/my/history" element={<HistoryEndUser />} /> */}
 
         {/* Onboarding */}
         <Route path="/onboarding" element={<Onboarding />} />

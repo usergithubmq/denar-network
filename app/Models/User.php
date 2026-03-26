@@ -71,6 +71,12 @@ class User extends Authenticatable
         return $this->hasOne(\App\Models\Cliente::class, 'user_id', 'id');
     }
 
+    public function endUser()
+    {
+        // Un User (con rol cliente_final) tiene un registro en la tabla end_users
+        return $this->hasOne(EndUser::class, 'user_id');
+    }
+
     /**
      * Un usuario (pagador) tiene un plan de pago.
      */
