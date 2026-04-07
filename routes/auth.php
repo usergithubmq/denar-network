@@ -28,4 +28,5 @@ Route::middleware('guest')->group(function () {
 // 3. Rutas con Auth (Sanctum)
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout']);
+    Route::post('/auth/update-first-password', [LoginController::class, 'updateFirstPassword']);
 });

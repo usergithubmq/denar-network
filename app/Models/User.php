@@ -40,6 +40,7 @@ class User extends Authenticatable
         'phone_verified_at',
         'role',
         'password',
+        'must_change_password',
     ];
 
     protected $hidden = [

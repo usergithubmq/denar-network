@@ -7,7 +7,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\User;
-use Illuminate\Http\JsonResponse; // 👈 Esto quita el error rojo de la imagen
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Hash;
 
 class LoginController extends Controller
 {
@@ -34,12 +35,31 @@ class LoginController extends Controller
             'user'    => [
                 'name' => $user->name,
                 'role' => $user->role, // 👈 Importante: 'admin' o 'cliente'
+                'must_change_password' => (bool) $user->must_change_password,
             ]
+        ]);
+    }
+
+    public function updateFirstPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'password' => 'required|string|min:10',
+        ]);
+
+        $user = $request->user();
+
+        // Ahora sí, Laravel encontrará la clase Hash aquí:
+        $user->password = Hash::make($request->password);
+        $user->must_change_password = false;
+        $user->save();
+
+        return response()->json([
+            'message' => 'Contraseña de Denar actualizada con éxito.',
+            'status'  => 'success'
         ]);
     }
     public function logout(Request $request)
     {
-        // Elimina el token actual de la base de datos
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Token eliminado, sesión cerrada']);

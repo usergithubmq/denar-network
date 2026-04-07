@@ -16,11 +16,12 @@ export default function ProfileView({ clienteInfo, onUpdate }) {
     const [loadingProfile, setLoadingProfile] = useState(false);
     const [loadingPass, setLoadingPass] = useState(false);
     const [successProfile, setSuccessProfile] = useState(false);
+    const brandColor = clienteInfo?.primary_color || "#60e2ff";
     const [successPass, setSuccessPass] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
     const fileInputRef = useRef(null);
-    const baseUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://app.koonfinansen.com.mx';
+    const baseUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://app.denar.network';
     const [preview, setPreview] = useState(null);
 
     useEffect(() => {
@@ -45,6 +46,7 @@ export default function ProfileView({ clienteInfo, onUpdate }) {
         symbol: /[!@#$%^&*(),.?":{}|<>]/.test(passData.password),
         match: passData.password.length > 0 && passData.password === passData.password_confirmation
     };
+
     const isPassStrong = Object.values(checks).every(Boolean);
 
     const handleUpdateProfile = async (e) => {
@@ -90,7 +92,16 @@ export default function ProfileView({ clienteInfo, onUpdate }) {
 
             {/* SECCIÓN 1: BRANDING & IDENTIDAD (COMPACTA) */}
             <form onSubmit={handleUpdateProfile} className="bg-[#d3e0e5] rounded-2xl shadow-sm border border-[#b8bfc0] overflow-hidden">
-                <div className="bg-[#051d26] px-6 py-4 flex items-center justify-between border-b border-[#60e2ff]">
+                <div className="bg-[#051d26] px-6 py-4 flex items-center justify-between border-b border-[#60e2ff]"
+                    style={{
+                        // 1. Animación más lenta (8s para un barrido cinematográfico)
+                        animation: 'shimmer-slow 8s linear infinite',
+                        // 2. Gradiente con el color del cliente al 80% de opacidad (cc) 
+                        // 3. El centro (50%) ahora es más ancho para que el color resalte
+                        backgroundImage: `linear-gradient(90deg, #051a22 0%, ${brandColor}cc 20%, #062b3b 100%)`,
+                        backgroundSize: '200% 100%',
+                        borderBottom: `5px solid ${brandColor}66` // Borde más presente
+                    }}>
                     <div className="flex items-center gap-4">
                         <div className="relative group w-14 h-14 shrink-0">
                             <div
@@ -140,7 +151,6 @@ export default function ProfileView({ clienteInfo, onUpdate }) {
                 }} className="hidden" accept="image/*" />
             </form>
 
-            {/* SECCIÓN 2: SEGURIDAD (COMPACTA) */}
             {/* SECCIÓN 2: SEGURIDAD (COMPACTA) */}
             <div className="bg-[#d3e0e5] rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="bg-[#051d26] px-6 py-3 border-b border-slate-200 flex items-center gap-3 text-white">

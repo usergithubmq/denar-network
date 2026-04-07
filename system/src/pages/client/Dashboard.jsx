@@ -9,11 +9,13 @@ import StpAccountsTable from "./components/StpAccountsTable";
 import BalanceModal from "./components/BalanceModal";
 import ClientSidebar from "./components/ClientSidebar";
 import DashboardHeader from "./components/DashboardHeader";
+import PasswordResetModal from "./components/PasswordResetModal";
 
 export default function Dashboard() {
     const navigate = useNavigate();
 
     // ESTADOS
+    const [showForceReset, setShowForceReset] = useState(false);
     const [vistaActual, setVistaActual] = useState('pagadores');
     const [showForm, setShowForm] = useState(false);
     const [endUsers, setEndUsers] = useState([]);
@@ -33,6 +35,17 @@ export default function Dashboard() {
         };
         window.addEventListener("scroll", handleScroll);
         return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
+
+    useEffect(() => {
+        // Checar si el usuario debe cambiar la contraseña
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (user?.must_change_password) {
+            setShowForceReset(true);
+        }
+
+        api.get("/client/profile").then(res => setClienteInfo(res.data));
+        fetchMyEndUsers();
     }, []);
 
     const fetchMyEndUsers = async () => {
@@ -146,7 +159,12 @@ export default function Dashboard() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 font-sans">
-            {/* 1. EL SIDEBAR COMPONENTE */}
+            {/* Insertar el Modal al inicio del renderizado */}
+            <PasswordResetModal
+                isOpen={showForceReset}
+                onSuccess={() => setShowForceReset(false)}
+            />
+            {/* EL SIDEBAR COMPONENTE */}
             <ClientSidebar
                 vistaActual={vistaActual}
                 setVistaActual={setVistaActual}

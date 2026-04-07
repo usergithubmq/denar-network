@@ -57,6 +57,7 @@ return new class extends Migration
             $table->enum('role', ['cliente', 'cliente_final', 'admin'])->default('cliente');
 
             $table->string('password');
+            $table->boolean('must_change_password')->default(true);
             $table->rememberToken();
             $table->timestamps();
         });

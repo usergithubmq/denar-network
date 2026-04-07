@@ -34,7 +34,8 @@ use App\Http\Controllers\Stp\StpWebhookController;
 require __DIR__ . '/auth.php';
 
 // --- RUTAS PÚBLICAS ---
-Route::post('/stp/webhook/abono', [StpWebhookController::class, 'recibirAbono']);
+Route::post('/stp/webhook/abono', [StpWebhookController::class, 'recibirAbono'])
+    ->withoutMiddleware([\Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class]);
 Route::get('/branding/{slug}', [App\Http\Controllers\PublicBrandingController::class, 'getBranding']);
 
 
