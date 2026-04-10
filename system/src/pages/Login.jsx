@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { authApi } from "../api/axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaLock, FaEnvelope, FaEye, FaEyeSlash, FaShieldAlt, FaArrowRight, FaSpinner } from "react-icons/fa";
+import ForgotPasswordModal from "./components/ForgotPasswordModal";
 
 export default function Login() {
     const { slug } = useParams();
@@ -11,6 +12,7 @@ export default function Login() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
+    const [showForgotModal, setShowForgotModal] = useState(false);
     const [loading, setLoading] = useState(false);
     const [isBrandingLoading, setIsBrandingLoading] = useState(!!slug);
     const [error, setError] = useState("");
@@ -206,6 +208,13 @@ export default function Login() {
                                     >
                                         {showPassword ? <FaEyeSlash /> : <FaEye />}
                                     </button>
+                                    <button
+                                        type="button" // Importante que sea type button para que no dispare el submit del login
+                                        onClick={() => setShowForgotModal(true)}
+                                        className="text-cyan-300 hover:text-cyan-500 text-sm transition-colors"
+                                    >
+                                        ¿Olvidaste tu contraseña?
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -232,6 +241,10 @@ export default function Login() {
                             />
                         </motion.button>
                     </form>
+                    <ForgotPasswordModal
+                        isOpen={showForgotModal}
+                        onClose={() => setShowForgotModal(false)}
+                    />
 
                     <div className="mt-12 flex flex-col items-center gap-2 opacity-20">
                         {slug && <span className="text-[8px] font-bold text-white uppercase tracking-[0.3em]">Operated by Denar Network</span>}

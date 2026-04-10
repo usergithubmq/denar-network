@@ -26,7 +26,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // 3. Excepciones de CSRF
         $middleware->validateCsrfTokens(except: [
-            'api/stp/webhook/abono', // Ruta exacta del webhook
+            'api/stp/webhook/abono',
+            'api/forgot-password',
+            'api/reset-password',
             'login',
         ]);
 

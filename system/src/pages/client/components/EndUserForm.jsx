@@ -154,7 +154,7 @@ export default function EndUserForm({ onUserCreated }) {
                     <div className="flex justify-end pt-4">
                         <button disabled={loading} className="w-full md:w-auto min-w-[280px] bg-[#0c516e] text-white px-12 py-4 rounded-2xl font-medium text-sm flex items-center justify-center gap-3 hover:bg-[#083b50] transition-all shadow-xl disabled:opacity-50">
                             {loading ? <FaSpinner className="animate-spin" /> : <FaSearch className="text-teal-400" />}
-                            <span className="tracking-widest">VALIDAR CONTRIBUYENTE</span>
+                            <span className="tracking-widest">Registrar</span>
                         </button>
                     </div>
                 </form>

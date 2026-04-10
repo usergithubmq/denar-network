@@ -19,21 +19,21 @@ class EndUserController extends Controller
 {
     public function index()
     {
-        $user = Auth::user();
+        $user = \Auth::user();
 
-        if (!$user->cliente) {
+        if (!$user || !$user->cliente) {
             return response()->json(['data' => [], 'message' => 'Sin empresa asociada'], 200);
         }
 
         try {
             $pagadores = $user->cliente->endUsers()
                 ->with(['user', 'paymentPlan'])
-                ->select('id', 'user_id', 'cliente_id', 'clabe_stp', 'referencia_interna', 'is_active', 'created_at')
                 ->orderBy('created_at', 'desc')
                 ->get()
                 ->map(function ($endUser) {
                     return [
                         'id'                 => $endUser->id,
+                        'user_id'            => $endUser->user_id,
                         'name'               => $endUser->user->name ?? 'N/A',
                         'email'              => $endUser->user->email ?? 'N/A',
                         'clabe_stp'          => $endUser->clabe_stp,
@@ -45,13 +45,15 @@ class EndUserController extends Controller
                 });
 
             return response()->json([
-                'empresa'         => $user->cliente->nombre_comercial ?? $user->cliente->nombre_legal ?? 'Mi Empresa',
-                'total_pagadores' => $pagadores->count(),
-                'data'            => $pagadores
+                'empresa' => $user->cliente->nombre_comercial ?? 'Mi Empresa',
+                'data'    => $pagadores
             ]);
         } catch (\Exception $e) {
-            Log::error('Error cargando pagadores: ' . $e->getMessage());
-            return response()->json(['error' => 'Error al cargar listado: ' . $e->getMessage()], 500);
+            \Log::error('Error en Pagadores: ' . $e->getMessage());
+            return response()->json([
+                'error'   => 'Error interno',
+                'message' => $e->getMessage() // Esto te mostrará el error real en la consola de React
+            ], 500);
         }
     }
 
@@ -108,56 +110,81 @@ class EndUserController extends Controller
         $user = Auth::user();
         $cliente = $user->cliente;
 
-        try {
-            // Ejecutamos la creación en DB
-            $resultado = DB::transaction(function () use ($request, $cliente) {
-                // A. Crear Usuario
-                $nuevoUsuario = User::create([
-                    'name'       => $request->name,
-                    'first_last' => $request->first_last ?? '',
-                    'email'      => $request->email,
-                    'password'   => Hash::make($request->document_value), // RFC como pass
-                    'role'       => 'cliente_final',
-                    'rfc'        => strtoupper($request->document_value),
-                ]);
+        // 1. VALIDACIÓN: El contrato (referencia_interna) debe ser único globalmente
+        $request->validate([
+            'referencia_interna' => 'required|unique:end_users,referencia_interna',
+            'document_value'     => 'required',
+            'email'              => 'required|email',
+            'name'               => 'required|string',
+        ], [
+            'referencia_interna.unique' => 'Este número de contrato ya existe en el sistema.',
+            'document_value.required'   => 'El RFC es obligatorio.'
+        ]);
 
-                // B. Generar CLABE
+        try {
+            $resultado = DB::transaction(function () use ($request, $cliente) {
+                $rfc = strtoupper(trim($request->document_value));
+
+                // A. Asegurar el Usuario (Persona Fiscal)
+                // Si el RFC ya existe, lo recupera. Si no, lo crea.
+                $usuario = User::firstOrCreate(
+                    ['rfc' => $rfc],
+                    [
+                        'name'       => $request->name,
+                        'first_last' => $request->first_last ?? '',
+                        'email'      => $request->email,
+                        'password'   => Hash::make($rfc), // RFC como password inicial
+                        'role'       => 'cliente_final',
+                    ]
+                );
+
+                // B. Generar CLABE Única para este Contrato
+                // Usamos el conteo global de EndUser para garantizar un consecutivo real
                 $tronco = $cliente->clabe_stp_intermedia;
-                $consecutivo = str_pad(($cliente->endUsers()->count() + 1), 4, '0', STR_PAD_LEFT);
+                $totalContratosGlobal = \App\Models\EndUser::count() + 1;
+                $consecutivo = str_pad($totalContratosGlobal, 4, '0', STR_PAD_LEFT);
+
                 $clabe17 = $tronco . $consecutivo;
                 $clabeCompleta = $clabe17 . $this->calcularDigitoVerificador($clabe17);
 
-                // C. Crear EndUser (Contrato)
+                // C. Crear el Registro del Contrato (EndUser)
+                // Vinculamos al usuario (nuevo o existente) con una nueva CLABE y Referencia
                 $contrato = EndUser::create([
                     'cliente_id'         => $cliente->id,
-                    'user_id'            => $nuevoUsuario->id,
+                    'user_id'            => $usuario->id,
                     'clabe_stp'          => $clabeCompleta,
                     'referencia_interna' => $request->referencia_interna,
                     'is_active'          => true,
                 ]);
 
-                // Retornamos ambos para usarlos en el correo
-                return ['usuario' => $nuevoUsuario, 'contrato' => $contrato];
+                return ['usuario' => $usuario, 'contrato' => $contrato];
             });
 
-            // --- D. ENVÍO DE EMAIL DE BIENVENIDA (BREVO) ---
+            // D. Envío de Email de Bienvenida
             try {
-                // Le pasamos el objeto usuario y el objeto cliente (la empresa)
                 Mail::to($resultado['usuario']->email)
                     ->send(new BienvenidoPagadorMail($resultado['usuario'], $cliente));
             } catch (\Exception $e) {
-                // Logueamos si el correo falló, pero no lanzamos error al front 
-                // porque el usuario YA fue creado exitosamente arriba.
-                Log::error("Error enviando correo de bienvenida: " . $e->getMessage());
+                Log::error("Error enviando correo de bienvenida a {$resultado['usuario']->email}: " . $e->getMessage());
             }
 
+            // Retornamos la data necesaria para que el Front genere el Plan de Pago
             return response()->json([
                 'success' => true,
-                'data'    => $resultado['contrato']
+                'message' => 'Contrato y CLABE generados exitosamente.',
+                'data'    => [
+                    'user_id'            => $resultado['usuario']->id,
+                    'clabe_stp'          => $resultado['contrato']->clabe_stp,
+                    'end_user_id'        => $resultado['contrato']->id,
+                    'referencia_interna' => $resultado['contrato']->referencia_interna
+                ]
             ], 201);
         } catch (\Exception $e) {
-            Log::error("Error en store EndUser: " . $e->getMessage());
-            return response()->json(['error' => $e->getMessage()], 500);
+            Log::error("Error crítico en store EndUser: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error'   => 'No se pudo procesar el registro: ' . $e->getMessage()
+            ], 500);
         }
     }
 

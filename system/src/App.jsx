@@ -21,6 +21,9 @@ import Onboarding from "./pages/Onboarding";
 import LivenessCheck from "./pages/LivenessCheck";
 import IneUpload from "./pages/IneUpload";
 
+// Reset y Forgot Password
+import ResetPassword from "./pages/ResetPassword";
+
 function App() {
   return (
     <BrowserRouter>
@@ -50,6 +53,8 @@ function App() {
         <Route path="/onboarding/ine/upload" element={<IneUpload />} />
 
         <Route path="*" element={<Navigate to="/login" />} />
+
+        <Route path="/password-reset/:token" element={<ResetPassword />} />
       </Routes>
     </BrowserRouter>
   );

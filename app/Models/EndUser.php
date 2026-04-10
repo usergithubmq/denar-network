@@ -40,7 +40,6 @@ class EndUser extends Model
 
     public function paymentPlan()
     {
-        // Un EndUser tiene un plan de pago (relación 1 a 1)
-        return $this->hasOne(PaymentPlan::class, 'user_id', 'user_id');
+        return $this->hasOne(\App\Models\PaymentPlan::class, 'cuenta_beneficiario', 'clabe_stp');
     }
 }

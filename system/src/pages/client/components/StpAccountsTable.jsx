@@ -55,11 +55,8 @@ export default function StpAccountsTable({
     // Calcular datos de pago para cada endUser
     const usersWithPayments = useMemo(() => {
         return endUsers.map(user => {
-            // 1. Prioridad: Si el usuario ya trae el plan (lo que vimos en el log), úsalo.
-            // Si no, intenta usar la función externa.
-            const paymentPlan = user.payment_plan || (getPaymentPlanForUser ? getPaymentPlanForUser(user.user_id || user.id) : null);
+            const paymentPlan = user.payment_plan;
 
-            // Si no hay plan, devolvemos el objeto base
             if (!paymentPlan) {
                 return {
                     ...user,
@@ -68,29 +65,28 @@ export default function StpAccountsTable({
                     creditoTotal: 0,
                     montoPagado: 0,
                     porcentajePagado: 0,
-                    estadoPago: 'sin_plan'
+                    estadoPago: 'sin_plan',
+                    moratoria: 0,
+                    montoNormal: 0
                 };
             }
 
-            // 2. Usamos los nombres exactos que vimos en tu consola:
-            const creditoTotal = parseFloat(paymentPlan.credito || 0);
-
+            const creditoBase = parseFloat(paymentPlan.credito || 0);
             const montoPagado = parseFloat(paymentPlan.monto_pagado_acumulado || 0);
             const moratoria = parseFloat(paymentPlan.moratoria || 0);
-            const deudaTotal = creditoTotal + moratoria;
 
-            // 3. Calculamos el saldo y progreso con los valores corregidos
-            const saldoPendiente = Math.max(deudaTotal - montoPagado, 0);
-            const porcentajePagado = creditoTotal > 0
-                ? Math.min((montoPagado / creditoTotal) * 100, 100)
+            const creditoTotal = creditoBase + moratoria;
+            const saldoPendiente = Math.max(creditoTotal - montoPagado, 0);
+
+            const porcentajePagado = creditoBase > 0
+                ? Math.min((montoPagado / creditoBase) * 100, 100)
                 : 0;
 
-            // --- LÓGICA DE ESTADOS MEJORADA ---
             let estadoPago = 'pendiente';
             const hoy = new Date();
             const fechaVenc = paymentPlan.fecha_vencimiento ? new Date(paymentPlan.fecha_vencimiento) : null;
 
-            if (saldoPendiente <= 0.5) { // Margen de centavos para marcar como pagado
+            if (saldoPendiente <= 0.9) {
                 estadoPago = 'pagado';
             } else if (paymentPlan.estado === 'vencido' || (fechaVenc && fechaVenc < hoy)) {
                 estadoPago = 'vencido';
@@ -102,20 +98,20 @@ export default function StpAccountsTable({
                 ...user,
                 tienePlan: true,
                 paymentPlan,
-                creditoTotal: deudaTotal, // Mostramos el total real que debe entrar
+                creditoTotal,
                 montoPagado,
                 saldoPendiente,
                 porcentajePagado,
                 estadoPago,
-                proximoPago: paymentPlan.monto_normal || 0,
+                proximoPago: parseFloat(paymentPlan.monto_normal || 0),
                 fechaVencimiento: paymentPlan.fecha_vencimiento,
                 numeroPago: paymentPlan.numero_pago || 0,
                 totalPagos: paymentPlan.total_pagos || 0,
-                montoNormal: paymentPlan.monto_normal || 0,
+                montoNormal: parseFloat(paymentPlan.monto_normal || 0),
                 moratoria
             };
         });
-    }, [endUsers, getPaymentPlanForUser]);
+    }, [endUsers]);
 
     // Obtener badge según estado
     const getEstadoBadge = (estado) => {
@@ -315,72 +311,76 @@ export default function StpAccountsTable({
                             {currentItems.length > 0 ? (
                                 currentItems.map((user, idx) => {
                                     const estadoBadge = getEstadoBadge(user.estadoPago);
-                                    const porcentajeProgreso = user.porcentajePagado || 0;
+                                    const rowKey = user.id;
 
                                     return (
-                                        <React.Fragment key={user.id}>
+                                        <React.Fragment key={rowKey}>
                                             <tr
                                                 className="group transition-all duration-300 hover:bg-gradient-to-r hover:from-slate-50 hover:to-teal-50/30 cursor-pointer"
-                                                onMouseEnter={() => setHoveredRow(user.id)}
+                                                onMouseEnter={() => setHoveredRow(rowKey)}
                                                 onMouseLeave={() => setHoveredRow(null)}
                                                 style={{
                                                     animation: `slideIn 0.3s ease-out ${idx * 0.05}s backwards`
                                                 }}
-                                                onClick={() => setExpandedUser(expandedUser === user.id ? null : user.id)}
+                                                onClick={() => setExpandedUser(expandedUser === rowKey ? null : rowKey)}
                                             >
                                                 <td className="py-3 px-6">
                                                     <div className="flex items-center gap-3">
                                                         <div className="relative">
                                                             <FaUserCircle className="text-slate-400 text-2xl group-hover:text-teal-500 transition-all duration-300 group-hover:scale-110" />
-                                                            {hoveredRow === user.id && (
+                                                            {hoveredRow === rowKey && (
                                                                 <div className="absolute inset-0 bg-teal-500 rounded-full blur-md opacity-20 animate-pulse"></div>
                                                             )}
                                                         </div>
-                                                        <div>
+                                                        <div className="flex flex-col gap-0.5">
                                                             <p className="font-bold text-slate-800 text-sm leading-tight group-hover:text-teal-600 transition-colors">
                                                                 {user.name}
                                                             </p>
-                                                            <p className="text-[11px] text-slate-400 leading-tight font-medium">
-                                                                {user.email || 'Sin correo electrónico'}
+                                                            <div className="flex items-center gap-1.5 group/clabe">
+                                                                <p className="text-[13px] font-mono font-black text-slate-500 tracking-tighter bg-white/50 px-1.5 py-0.5 rounded border border-slate-200 group-hover/clabe:border-teal-200 group-hover/clabe:bg-teal-50 group-hover/clabe:text-teal-700 transition-all">
+                                                                    {formatClabe(user.clabe_stp)}
+                                                                </p>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleCopy(user.clabe_stp, rowKey);
+                                                                    }}
+                                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 transition-all duration-300 hover:bg-teal-100 active:scale-90"
+                                                                >
+                                                                    {copiedId === rowKey ? <FaCheckCircle size={12} className="text-teal-600" /> : <FaCopy size={12} />}
+                                                                </button>
+                                                                {user.tienePlan && (
+                                                                    <button className="p-1.5 text-teal-600">
+                                                                        {expandedUser === rowKey ? <FaChevronUp size={11} /> : <FaChevronDown size={11} />}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-[12px] text-slate-500 leading-tight font-medium opacity-70">
+                                                                {user.email}
                                                             </p>
                                                         </div>
                                                     </div>
                                                 </td>
 
                                                 <td className="py-3 px-6">
-                                                    {/* Calculamos el progreso internamente para mayor claridad */}
-                                                    {(() => {
-                                                        const total = parseFloat(user.creditoTotal) || 0;
-                                                        const pagado = parseFloat(user.montoPagado) || 0;
-                                                        const porcentaje = total > 0 ? Math.min((pagado / total) * 100, 100) : 0;
-
-                                                        return (
-                                                            <div className="space-y-1">
-                                                                <div className="flex justify-between text-xs">
-                                                                    <span className="text-slate-600">Crédito:</span>
-                                                                    <span className="font-bold text-slate-800">
-                                                                        {formatMonto(total)}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="flex justify-between text-xs">
-                                                                    <span className="text-slate-600">Pagado:</span>
-                                                                    <span className="font-bold text-[#279a94]">
-                                                                        {formatMonto(pagado)} {/* <--- Aquí se pinta el 2500 */}
-                                                                    </span>
-                                                                </div>
-                                                                {/* Mostramos la barra si el usuario tiene un plan activo */}
-                                                                {user.tienePlan && (
-                                                                    <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden shadow-inner">
-                                                                        <div
-                                                                            className="bg-gradient-to-r from-teal-500 to-teal-600 h-full rounded-full transition-all duration-700 ease-out"
-                                                                            style={{ width: `${porcentaje}%` }}
-                                                                            title={`${porcentaje.toFixed(2)}%`}
-                                                                        />
-                                                                    </div>
-                                                                )}
+                                                    <div className="space-y-1">
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-slate-600">Crédito:</span>
+                                                            <span className="font-bold text-slate-800">{formatMonto(user.creditoTotal)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-slate-600">Pagado:</span>
+                                                            <span className="font-bold text-[#279a94]">{formatMonto(user.montoPagado)}</span>
+                                                        </div>
+                                                        {user.tienePlan && (
+                                                            <div className="w-full bg-slate-200 rounded-full h-1.5 mt-1 overflow-hidden shadow-inner">
+                                                                <div
+                                                                    className="bg-gradient-to-r from-teal-500 to-teal-600 h-full rounded-full transition-all duration-700"
+                                                                    style={{ width: `${user.porcentajePagado}%` }}
+                                                                />
                                                             </div>
-                                                        );
-                                                    })()}
+                                                        )}
+                                                    </div>
                                                 </td>
 
                                                 <td className="py-3 px-6 text-right">
@@ -401,9 +401,8 @@ export default function StpAccountsTable({
                                                     </span>
                                                 </td>
 
-
                                                 <td className="py-3 px-6 text-center">
-                                                    <span className="inline-block bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 px-3 py-1 rounded-full text-[10px] font-normal shadow-sm">
+                                                    <span className="inline-block bg-white/80 text-slate-700 px-3 py-1 rounded-full text-[10px] font-bold border border-slate-200 shadow-sm">
                                                         {user.referencia_interna || 'S/R'}
                                                     </span>
                                                 </td>
@@ -413,98 +412,46 @@ export default function StpAccountsTable({
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                onViewBalance(user);
+                                                                handleCopy(user.clabe_stp, rowKey);
                                                             }}
-                                                            className="p-2 rounded-xl text-teal-600 hover:text-white hover:bg-teal-600 transition-all duration-300"
-                                                            title="Ver detalles"
+                                                            className="p-2 rounded-xl text-slate-500 hover:text-teal-600 hover:bg-white transition-all duration-300 shadow-sm"
                                                         >
-                                                            <FaEye size={14} />
+                                                            <FaCopy size={14} />
                                                         </button>
-
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleCopy(user.clabe_stp, user.id);
-                                                            }}
-                                                            className="p-2 rounded-xl text-slate-400 hover:text-teal-600 transition-all duration-300 hover:bg-teal-50 active:scale-90"
-                                                            title="Copiar CLABE"
-                                                        >
-                                                            {copiedId === user.id ? (
-                                                                <FaRegCopy size={14} className="text-teal-600" />
-                                                            ) : (
-                                                                <FaCopy size={14} />
-                                                            )}
-                                                        </button>
-
-                                                        {user.tienePlan && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setExpandedUser(expandedUser === user.id ? null : user.id);
-                                                                }}
-                                                                className="p-2 rounded-xl text-slate-400 hover:text-teal-600 transition-all duration-300"
-                                                            >
-                                                                {expandedUser === user.id ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
-                                                            </button>
-                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
 
-                                            {/* Detalles expandidos del PaymentPlan */}
-                                            {expandedUser === user.id && user.tienePlan && (
-                                                <tr className="bg-gradient-to-r from-slate-50 to-teal-50/30">
-                                                    <td colSpan="7" className="py-4 px-6">
-                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                            <div className="bg-white rounded-xl p-4 shadow-sm">
-                                                                <h4 className="text-xs font-bold text-teal-600 uppercase tracking-wider mb-2">Detalles del Crédito</h4>
+                                            {/* Fila Expandida */}
+                                            {expandedUser === rowKey && user.tienePlan && (
+                                                <tr className="bg-white/50 backdrop-blur-sm">
+                                                    <td colSpan="6" className="py-6 px-8 border-x-2 border-teal-500/20">
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
+                                                            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                                                                <h4 className="text-[10px] font-black text-teal-600 uppercase mb-3 flex items-center gap-2">
+                                                                    <FaWallet /> Crédito
+                                                                </h4>
                                                                 <div className="space-y-2">
-                                                                    <div className="flex justify-between text-sm">
-                                                                        <span className="text-slate-600">Monto del crédito:</span>
-                                                                        <span className="text-slate-700 font-bold">{formatMonto(user.creditoTotal)}</span>
-                                                                    </div>
-                                                                    <div className="flex justify-between text-sm">
-                                                                        <span className="text-slate-600">Enganche:</span>
-                                                                        <span className="text-slate-700 font-bold">{formatMonto(user.paymentPlan?.enganche)}</span>
-                                                                    </div>
-                                                                    <div className="flex justify-between text-sm">
-                                                                        <span className="text-slate-600">Plazo:</span>
-                                                                        <span className="text-slate-700 font-bold">{user.paymentPlan?.plazo_credito_meses} meses</span>
-                                                                    </div>
+                                                                    <div className="flex justify-between text-sm"><span className="text-slate-500">Monto Base:</span><span className="font-bold">{formatMonto(user.paymentPlan.credito)}</span></div>
+                                                                    <div className="flex justify-between text-sm"><span className="text-slate-500">Enganche:</span><span className="font-bold">{formatMonto(user.paymentPlan.enganche)}</span></div>
                                                                 </div>
                                                             </div>
-
-                                                            <div className="bg-white rounded-xl p-4 shadow-sm">
-                                                                <h4 className="text-xs font-bold text-teal-600 uppercase tracking-wider mb-2">Información de Pagos</h4>
+                                                            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                                                                <h4 className="text-[10px] font-black text-teal-600 uppercase mb-3 flex items-center gap-2">
+                                                                    <FaChartLine /> Mensualidad
+                                                                </h4>
                                                                 <div className="space-y-2">
-                                                                    <div className="flex justify-between text-sm">
-                                                                        <span className="text-slate-600">Pago mensual:</span>
-                                                                        <span className="text-slate-700 font-bold">{formatMonto(user.montoNormal)}</span>
-                                                                    </div>
-                                                                    <div className="flex justify-between text-sm">
-                                                                        <span className="text-slate-600">Moratoria:</span>
-                                                                        <span className="text-red-600 font-bold">{formatMonto(user.moratoria)}</span>
-                                                                    </div>
-                                                                    <div className="flex justify-between text-sm">
-                                                                        <span className="text-slate-600">Total pagos:</span>
-                                                                        <span className="text-slate-700 font-bold">{user.numeroPago} de {user.totalPagos}</span>
-                                                                    </div>
+                                                                    <div className="flex justify-between text-sm"><span className="text-slate-500">Pago Normal:</span><span className="font-bold">{formatMonto(user.montoNormal)}</span></div>
+                                                                    <div className="flex justify-between text-sm"><span className="text-slate-500">Mora:</span><span className="font-bold text-red-500">{formatMonto(user.moratoria)}</span></div>
                                                                 </div>
                                                             </div>
-
-                                                            <div className="bg-white rounded-xl p-4 shadow-sm">
-                                                                <h4 className="text-xs font-bold text-teal-600 uppercase tracking-wider mb-2">Próximos Pasos</h4>
-                                                                <div className="space-y-2">
-                                                                    <div className="flex items-center gap-2 text-sm">
-                                                                        <FaCalendarAlt className="text-teal-500" />
-                                                                        <span className="text-slate-600">Próximo vencimiento:</span>
-                                                                        <span className="text-slate-700 font-bold">{formatFecha(user.fechaVencimiento)}</span>
-                                                                    </div>
-                                                                    {user.estadoPago === 'vencido' && (
-                                                                        <div className="mt-2 p-2 bg-red-50 rounded-lg border border-red-200">
-                                                                            <p className="text-[11px] text-red-700 font-medium">⚠️ Pago vencido - Se requiere atención inmediata</p>
-                                                                        </div>
-                                                                    )}
+                                                            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                                                                <h4 className="text-[10px] font-black text-teal-600 uppercase mb-3 flex items-center gap-2">
+                                                                    <FaCalendarAlt /> Próximo Pago
+                                                                </h4>
+                                                                <div className="space-y-2 text-center">
+                                                                    <p className="text-lg font-black text-slate-800">{formatFecha(user.fechaVencimiento)}</p>
+                                                                    <p className="text-[10px] text-slate-400">Referencia: {user.referencia_interna}</p>
                                                                 </div>
                                                             </div>
                                                         </div>
