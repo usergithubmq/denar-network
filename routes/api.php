@@ -59,6 +59,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 1. DASHBOARD SUPER ADMIN
     Route::prefix('admin')->group(function () {
+        Route::get('/check-inventory', [ClientController::class, 'checkInventory']);
         Route::post('/clients', [ClientController::class, 'store']);
         Route::get('/clients', [ClientController::class, 'index']);
     });

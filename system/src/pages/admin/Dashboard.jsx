@@ -14,18 +14,19 @@ import FormClienteModal from "./components/modal/FormClienteModal";
 
 export default function Dashboard() {
     const navigate = useNavigate();
-    const [view, setView] = useState("dashboard"); // dashboard | list | logs
+    const [view, setView] = useState("dashboard");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
 
     // Estado inicial del formulario
     const initialFormState = {
-        person_type: "moral",
-        name: "",
-        first_last: "",
-        second_last: "",
+        nombre_comercial: "",
         email: "",
         rfc: "",
+        clabe_stp_intermedia: "", // CAMPO CRÍTICO
+        tipo_cliente: 'empresa', // <--- CAMBIO AQUÍ
+        first_last: "",
+        second_last: "",
         password: "password123"
     };
 
@@ -35,30 +36,38 @@ export default function Dashboard() {
 
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
+
+        // Validación manual antes de disparar
+        if (!formData.clabe_stp_intermedia) {
+            alert("Error: No has seleccionado un nodo (Tronco STP)");
+            return;
+        }
+
         setLoading(true);
         try {
-            // 1. Obtener la ficha de seguridad (CSRF)
             await authApi.get("/sanctum/csrf-cookie");
 
-            // 2. Generar el Slug para evitar el error 1364 de SQL
-            const generatedSlug = formData.name
+            // Generar slug basado en el nuevo nombre de campo
+            const generatedSlug = formData.nombre_comercial
                 .toLowerCase()
+                .trim()
                 .replace(/ /g, '-')
                 .replace(/[^\w-]+/g, '') + '-' + Math.random().toString(36).substring(2, 7);
 
-            // 3. Unir el slug a los datos
             const dataToSync = { ...formData, slug: generatedSlug };
 
-            // 4. Enviar a Laravel usando la instancia 'api'
+            // Enviar a la ruta que definimos en el Controller
             await api.post("/admin/clients", dataToSync);
 
-            alert("¡Éxito! Cliente registrado con sus cuentas STP.");
-            setIsModalOpen(false); // Si usas el modal
+            alert("¡Nodo Aprovisionado con Éxito!");
+            setIsModalOpen(false);
             setFormData(initialFormState);
             setView("list");
         } catch (err) {
             console.error("Error Detallado:", err.response?.data);
-            alert("Error: " + (err.response?.data?.message || "Error de conexión"));
+            const msg = err.response?.data?.message || "Error de conexión";
+            const errors = err.response?.data?.errors ? Object.values(err.response.data.errors).flat().join('\n') : "";
+            alert(`Error: ${msg}\n${errors}`);
         } finally {
             setLoading(false);
         }

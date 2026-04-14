@@ -12,31 +12,37 @@ return new class extends Migration
             $table->id();
 
             // Relaciones y Seguimiento
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('cuenta_beneficiario');
-            $table->string('referencia_contrato')->nullable();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade'); //ok
+            $table->string('cuenta_beneficiario'); //ok
+            $table->string('referencia_contrato')->nullable(); //ok
 
             // Datos de Originación
-            $table->decimal('credito', 15, 2)->nullable();
-            $table->integer('plazo_credito_meses')->nullable();
-            $table->decimal('enganche', 15, 2)->default(0);
+            $table->decimal('valor_factura', 15, 2)->nullable(); //ok
+            $table->decimal('credito', 15, 2)->nullable(); //ok
+            $table->integer('plazo_credito_meses')->nullable(); //ok
+            $table->integer('plazo_remanente_credito')->nullable(); //ok
+
+            $table->decimal('enganche', 15, 2)->default(0); //ok
+
+            $table->decimal('saldo_restante', 15, 2)->default(0); //ok
 
             // Datos de la Mensualidad
-            $table->integer('numero_pago')->nullable();
-            $table->integer('total_pagos')->nullable();
-            $table->decimal('monto_normal', 15, 2)->nullable();
-            $table->decimal('moratoria', 15, 2)->default(0);
+            $table->decimal('monto_normal', 15, 2)->nullable(); //ok
+            $table->decimal('monto_normal_final', 15, 2)->nullable(); //ok
+
 
             // Fechas
             $table->date('fecha_vencimiento')->nullable();
             $table->date('fecha_limite_habil')->nullable();
+            $table->decimal('moratoria', 15, 2)->default(0); //ok
 
             // Estado y Control de Pagos
             // ANTES TENÍA UN PUNTO (.), AHORA LA FLECHA (->) CORRECTA:
             $table->enum('estado', ['pendiente', 'pagado', 'atrasado', 'parcial'])->default('pendiente');
 
             $table->decimal('monto_pagado_acumulado', 15, 2)->default(0);
-            $table->timestamp('fecha_pago_real')->nullable();
+            $table->integer('pagos_realizados')->default(0); //ok
+
 
             $table->timestamps();
 

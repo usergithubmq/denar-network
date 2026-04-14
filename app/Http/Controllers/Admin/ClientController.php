@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class ClientController extends Controller
 {
@@ -23,74 +24,88 @@ class ClientController extends Controller
         return response()->json($clientes);
     }
 
+    /**
+     * Registra un nuevo Centro de Costos (Cliente) vinculado a un Usuario Administrador.
+     */
     public function store(Request $request)
     {
-        $rules = [
-            'name'        => 'required|string|max:255',
-            'email'       => 'required|email|unique:users,email',
-            'password'    => 'required|min:8',
-            'person_type' => 'required|in:fisica,moral',
-            'rfc'         => 'required|string|max:13',
-        ];
-
-        if ($request->person_type === 'fisica') {
-            $rules['first_last'] = 'required|string|max:100';
-        }
-
-        $request->validate($rules);
+        // 1. Validación estricta
+        $request->validate([
+            'nombre_comercial'     => 'required|string|max:255',
+            'email'                => 'required|email|unique:users,email',
+            'clabe_stp_intermedia' => 'required|string|size:13|unique:clientes,clabe_stp_intermedia',
+            'rfc'                  => 'nullable|string|max:13',
+            'tipo_cliente'          => 'required|string|in:empresa,fisica',
+        ]);
 
         try {
-            return DB::transaction(function () use ($request) {
-                // 1. Crear el Usuario Base
+            $resultado = DB::transaction(function () use ($request) {
+
+                // 1. Crear el Usuario
                 $user = User::create([
-                    'name'       => $request->name,
-                    'email'      => strtolower($request->email),
-                    'password'   => Hash::make($request->password),
-                    'role'       => 'cliente',
-                    'first_last' => $request->person_type === 'fisica' ? $request->first_last : '',
-                    'second_last' => $request->person_type === 'fisica' ? $request->second_last : null,
+                    'name'     => $request->nombre_comercial,
+                    'email'    => $request->email,
+                    'password' => Hash::make('password123'),
+                    'active'   => true,
+                    'role'     => 'cliente',
+                    'must_change_password' => true
                 ]);
 
-                // 2. LÓGICA DE CLABES STP (Denar Engine)
-                $banco = "646";
-                $plaza = "180";
-                $prefijoEmpresa = "6665";
+                // 2. Lógica de CLABE de 18 dígitos
+                $tronco = $request->clabe_stp_intermedia;
+                $clabeParcial = $tronco . "0000";
+                $digitoVerificador = $this->calcularDigitoVerificador($clabeParcial);
+                $clabeFinal = $clabeParcial . $digitoVerificador;
 
-                // Calculamos el siguiente prefijo de cliente (027, 028, etc.)
-                // Si es el primero, empezamos en 27
-                $proximoId = (Cliente::max('id') ?? 0) + 06;
-                $prefijoCliente = str_pad($proximoId, 3, '0', STR_PAD_LEFT);
+                // 3. Generar Slug
+                $slug = Str::slug($request->nombre_comercial) . '-' . Str::random(5);
 
-                // TRONCO (13 dígitos) para cobranza referenciada
-                $tronco = $banco . $plaza . $prefijoEmpresa . $prefijoCliente;
-
-                // CLABE PROPIA (18 dígitos) para que el cliente reciba créditos
-                // Usamos el "0000" como cuenta maestra del cliente y calculamos su dígito verificador
-                $clabePropia17 = $tronco . "0000";
-                $digitoPropio = $this->calcularDigitoVerificador($clabePropia17);
-                $clabeCompletaPropia = $clabePropia17 . $digitoPropio;
-
-                // 3. Crear el Perfil de Cliente con sus llaves financieras
-                $user->cliente()->create([
-                    'slug'                  => Str::slug($request->name) . '-' . Str::random(5),
-                    'rfc'                   => strtoupper($request->rfc),
-                    'tipo_cliente'          => ($request->person_type === 'moral') ? 'empresa' : 'persona',
-                    'nombre_legal'          => $request->name, // Opcional: ajustar según input
-                    'estatus'               => 'aprobado',
-                    'clabe_stp'             => $clabeCompletaPropia,    // CLABE Maestra (18)
-                    'clabe_stp_intermedia'  => $tronco,                 // Raíz para EndUsers (13)
-                    'usa_cobranza'          => true,                    // Habilitado por defecto
+                // 4. Crear el Cliente - Mapeamos el tipo de persona
+                $cliente = Cliente::create([
+                    'user_id'              => $user->id,
+                    'nombre_comercial'     => $request->nombre_comercial,
+                    'nombre_legal'         => $request->nombre_comercial,
+                    'tipo_cliente'         => $request->tipo_cliente,
+                    'clabe_stp_intermedia' => $tronco,
+                    'clabe_stp'            => $clabeFinal,
+                    'rfc'                  => $request->rfc,
+                    'slug'                 => $slug,
+                    'is_active'            => true,
                 ]);
 
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Entidad registrada con éxito en Denar.',
-                    'user'    => $user->load('cliente')
-                ], 201);
+                return $cliente;
             });
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Infraestructura Denar provisionada correctamente.',
+                'data'    => $resultado
+            ], 201);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+            Log::error("Error en Registro Denar: " . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No se pudo aprovisionar el nodo.',
+                'details' => $e->getMessage()
+            ], 500);
         }
+    }
+
+    /**
+     * Devuelve la disponibilidad de troncos (Opcional para tu menú desplegable)
+     */
+    public function checkInventory()
+    {
+        // Extrae los últimos 3 dígitos de la clabe_stp_intermedia
+        $ocupados = Cliente::pluck('clabe_stp_intermedia')
+            ->map(function ($clabe) {
+                return substr($clabe, -3);
+            })
+            ->filter() // Elimina nulos por si acaso
+            ->values()
+            ->toArray();
+
+        return response()->json($ocupados);
     }
 
     public function getProfile(Request $request)
