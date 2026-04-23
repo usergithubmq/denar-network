@@ -27,6 +27,7 @@ return new class extends Migration
             $table->decimal('saldo_restante', 15, 2)->default(0); //ok
 
             // Datos de la Mensualidad
+            $table->boolean('monto_libre')->default(false);
             $table->decimal('monto_normal', 15, 2)->nullable(); //ok
             $table->decimal('monto_normal_final', 15, 2)->nullable(); //ok
 
@@ -34,13 +35,16 @@ return new class extends Migration
             // Fechas
             $table->date('fecha_vencimiento')->nullable();
             $table->date('fecha_limite_habil')->nullable();
+
             $table->decimal('moratoria', 15, 2)->default(0); //ok
+            $table->string('tipo_moratoria')->default('fijo');
 
             // Estado y Control de Pagos
             // ANTES TENÍA UN PUNTO (.), AHORA LA FLECHA (->) CORRECTA:
             $table->enum('estado', ['pendiente', 'pagado', 'atrasado', 'parcial'])->default('pendiente');
 
             $table->decimal('monto_pagado_acumulado', 15, 2)->default(0);
+            $table->dateTime('fecha_pago_real')->nullable();
             $table->integer('pagos_realizados')->default(0); //ok
 
 

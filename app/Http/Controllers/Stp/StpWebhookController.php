@@ -76,46 +76,60 @@ class StpWebhookController extends Controller
 
         if (empty($clabe)) return;
 
-        // Buscamos el plan por CLABE sin importar el estado actual
-        // (A veces un cliente paga un plan que ya estaba 'pagado' por error y queremos trackearlo)
         $plan = PaymentPlan::where('cuenta_beneficiario', $clabe)->first();
 
         if ($plan) {
             $nuevoAcumulado = (float)($plan->monto_pagado_acumulado ?? 0) + $montoRecibido;
+            $deudaTotal = (float)($plan->monto_normal_final ?? 0) + (float)($plan->moratoria ?? 0);
 
-            // Sumamos el crédito base + moratoria
-            $deudaTotal = (float)($plan->credito ?? 0) + (float)($plan->moratoria ?? 0);
+            // --- NUEVA LÓGICA DE ESTADO ---
+            $hoy = now();
+            $fechaVenc = \Carbon\Carbon::parse($plan->fecha_vencimiento);
 
-            // Si el acumulado llega al total (con margen de centavos), es pagado
-            $nuevoEstado = ($nuevoAcumulado >= ($deudaTotal - 0.05)) ? 'pagado' : 'parcial';
+            if ($nuevoAcumulado >= ($deudaTotal - 0.50)) {
+                $nuevoEstado = 'pagado';
+            } elseif ($hoy->gt($fechaVenc)) {
+                $nuevoEstado = 'vencido';
+            } else {
+                $nuevoEstado = $nuevoAcumulado > 0 ? 'parcial' : 'pendiente';
+            }
+            // ------------------------------
 
-            // Actualizamos usando update para disparar eventos de Eloquent
+            $nuevosPagosRealizados = ($plan->pagos_realizados ?? 0) + 1;
+            $nuevoPlazoRemanente = ($plan->plazo_remanente_credito > 0) ? ($plan->plazo_remanente_credito - 1) : 0;
+
             $plan->update([
-                'monto_pagado_acumulado' => $nuevoAcumulado,
-                'estado'                 => $nuevoEstado,
-                'fecha_pago_real'        => now(),
+                'monto_pagado_acumulado'   => $nuevoAcumulado,
+                'estado'                   => $nuevoEstado,
+                'fecha_pago_real'          => now(),
+                'pagos_realizados'         => $nuevosPagosRealizados,
+                'plazo_remanente_credito'  => $nuevoPlazoRemanente,
             ]);
 
-            // 2. Crear el registro en la tabla 'pagos' para el historial contable
-            Pago::create([
-                'payment_plan_id' => $plan->id,
-                'stp_abono_id'    => $abono->id,
-                'credito_id'      => $plan->credito_id,
-                'end_user_id'     => $plan->end_user_id,
-                'cliente_id'      => $plan->cliente_id,
-                'monto_pago'      => $montoRecibido,
-                'fecha_pago'      => now(),
-                'estatus'         => 'confirmado',
-                'clave_rastreo'   => $abono->clave_rastreo,
-                'metodo_pago'     => 'SPEI',
-                'metadata_stp'    => [
-                    'banco_ordenante' => $abono->institucion_ordenante,
-                    'concepto'        => $abono->concepto_pago,
-                    'referencia'      => $abono->referencia_numerica
-                ]
-            ]);
+            try {
+                // ... (Tu código de Pago::create se queda igual, está bien el try/catch)
+                Pago::create([
+                    'payment_plan_id' => $plan->id,
+                    'stp_abono_id'    => $abono->id,
+                    'credito_id'      => $plan->credito_id ?? null,
+                    'end_user_id'     => $plan->user_id,
+                    'cliente_id'      => $plan->cliente_id ?? null,
+                    'monto_pago'      => $montoRecibido,
+                    'fecha_pago'      => now(),
+                    'estatus'         => 'confirmado',
+                    'clave_rastreo'   => $abono->clave_rastreo,
+                    'metodo_pago'     => 'SPEI',
+                    'metadata_stp'    => json_encode([
+                        'banco_ordenante' => $abono->institucion_ordenante,
+                        'concepto'        => $abono->concepto_pago,
+                        'referencia'      => $abono->referencia_numerica
+                    ])
+                ]);
+            } catch (\Exception $e) {
+                Log::error("No se pudo crear el registro en la tabla pagos: " . $e->getMessage());
+            }
 
-            Log::info("¡ÉXITO! CLABE {$clabe} actualizó a {$nuevoAcumulado}.");
+            Log::info("¡PLAN ACTUALIZADO! CLABE {$clabe}: Pago {$nuevosPagosRealizados}/{$plan->plazo_credito_meses}. Estado: {$nuevoEstado}");
         } else {
             Log::error("ERROR CRÍTICO: La CLABE {$clabe} no existe en la tabla payment_plans.");
         }

@@ -5,6 +5,7 @@ import {
     FaWallet, FaHistory, FaChevronDown, FaChevronUp, FaCalendarAlt,
     FaChartLine, FaPercent
 } from "react-icons/fa";
+import PlanDetalleEditable from "./subcomponentes/PlanDetalleEditable";
 
 export default function StpAccountsTable({
     clienteInfo,
@@ -12,7 +13,8 @@ export default function StpAccountsTable({
     onCopy,
     loading,
     onViewBalance,
-    getPaymentPlanForUser
+    getPaymentPlanForUser,
+    onRefresh
 }) {
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -67,14 +69,22 @@ export default function StpAccountsTable({
                     porcentajePagado: 0,
                     estadoPago: 'sin_plan',
                     moratoria: 0,
-                    montoNormal: 0
+                    montoNormal: 0,
+                    totalAPagar: 0,
+                    montoDisplay: 0
                 };
             }
 
+            // 1. Cálculos de dinero base
             const creditoBase = parseFloat(paymentPlan.credito || 0);
             const montoPagado = parseFloat(paymentPlan.monto_pagado_acumulado || 0);
             const moratoria = parseFloat(paymentPlan.moratoria || 0);
+            const montoNormalFinal = parseFloat(paymentPlan.monto_normal_final || 0);
 
+            // El total real que debería haber pagado a la fecha para estar al corriente
+            const totalEsperadoAlDia = montoNormalFinal + moratoria;
+
+            const totalAPagar = montoNormalFinal + moratoria;
             const creditoTotal = creditoBase + moratoria;
             const saldoPendiente = Math.max(creditoTotal - montoPagado, 0);
 
@@ -82,16 +92,37 @@ export default function StpAccountsTable({
                 ? Math.min((montoPagado / creditoBase) * 100, 100)
                 : 0;
 
-            let estadoPago = 'pendiente';
+            // 2. Lógica de Tiempos
             const hoy = new Date();
+            const hoySinHora = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()).getTime();
             const fechaVenc = paymentPlan.fecha_vencimiento ? new Date(paymentPlan.fecha_vencimiento) : null;
+            const vencSinHora = fechaVenc
+                ? new Date(fechaVenc.getFullYear(), fechaVenc.getMonth(), fechaVenc.getDate()).getTime()
+                : null;
 
-            if (saldoPendiente <= 0.9) {
+            // 3. DETERMINACIÓN DE ESTADO PRIORIZANDO EL PAGO REALIZADO
+            let estadoPago = paymentPlan.estado || 'pendiente';
+            let montoAMostrar = 0;
+
+            // REGLA MAESTRA: Si el monto acumulado ya cubre la mensualidad + moratoria de este periodo
+            const yaCubrioMensualidad = montoPagado >= totalEsperadoAlDia;
+
+            if (saldoPendiente <= 0.9 || yaCubrioMensualidad) {
                 estadoPago = 'pagado';
-            } else if (paymentPlan.estado === 'vencido' || (fechaVenc && fechaVenc < hoy)) {
+                montoAMostrar = 0; // Ya no debe nada de este periodo
+            } else if (vencSinHora && hoySinHora > vencSinHora) {
+                // CASO VENCIDO: No ha cubierto el monto y ya se pasó la fecha
                 estadoPago = 'vencido';
-            } else if (montoPagado > 0) {
-                estadoPago = 'parcial';
+                // Mostramos solo lo que le falta para cubrir este periodo
+                montoAMostrar = totalEsperadoAlDia - montoPagado;
+            } else if (vencSinHora && hoySinHora === vencSinHora) {
+                // CASO HOY: Es el día del cobro
+                estadoPago = 'pendiente';
+                montoAMostrar = totalEsperadoAlDia - montoPagado;
+            } else {
+                // CASO FUTURO
+                estadoPago = montoPagado > 0 ? 'parcial' : 'pendiente';
+                montoAMostrar = 0;
             }
 
             return {
@@ -103,19 +134,30 @@ export default function StpAccountsTable({
                 saldoPendiente,
                 porcentajePagado,
                 estadoPago,
-                proximoPago: parseFloat(paymentPlan.monto_normal || 0),
+
+                // --- DATOS PARA LA TABLA Y BADGES ---
+                montoDisplay: montoAMostrar,
+                totalAPagar,
+                moratoria,
+                montoNormalFinal,
+
+                // Sincronización con nombres de DB
+                pagos_realizados: paymentPlan.pagos_realizados || 0,
+                plazo_credito_meses: paymentPlan.plazo_credito_meses || 0,
+
+                proximoPago: montoNormalFinal,
                 fechaVencimiento: paymentPlan.fecha_vencimiento,
-                numeroPago: paymentPlan.numero_pago || 0,
-                totalPagos: paymentPlan.total_pagos || 0,
-                montoNormal: parseFloat(paymentPlan.monto_normal || 0),
-                moratoria
+                montoNormal: montoNormalFinal
             };
         });
     }, [endUsers]);
 
     // Obtener badge según estado
-    const getEstadoBadge = (estado) => {
-        switch (estado) {
+    const getEstadoBadge = (user) => {
+        // Extraemos lo que calculamos en el useMemo
+        const { estadoPago, montoDisplay } = user;
+
+        switch (estadoPago) {
             case 'pagado':
                 return {
                     icon: <FaCheckCircle size={12} />,
@@ -131,18 +173,22 @@ export default function StpAccountsTable({
             case 'vencido':
                 return {
                     icon: <FaExclamationTriangle size={12} />,
-                    text: 'VENCIDO',
+                    // Si hay montoDisplay (moratoria), lo muestra, si no, solo VENCIDO
+                    text: montoDisplay > 0 ? `VENCIDO: ${formatMonto(montoDisplay)}` : 'VENCIDO',
                     className: 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-red-500/30 animate-pulse'
                 };
             case 'sin_plan':
                 return {
                     icon: <FaClock size={12} />,
+                    text: 'SIN PLAN',
                     className: 'bg-gradient-to-r from-slate-500 to-gray-600 text-white'
                 };
             default:
+                // Lógica para PENDIENTE: Si hoy es la fecha, muestra "PAGAR HOY"
+                const textoDefault = montoDisplay > 0 ? `PAGAR HOY: ${formatMonto(montoDisplay)}` : 'PENDIENTE';
                 return {
                     icon: <FaClock size={12} />,
-                    text: 'PENDIENTE',
+                    text: textoDefault,
                     className: 'bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-yellow-500/30'
                 };
         }
@@ -301,16 +347,15 @@ export default function StpAccountsTable({
                                     Cliente
                                 </th>
                                 <th className="py-6 px-6 text-[10px] font-black text-white uppercase tracking-[0.3em] text-right">Movimientos</th>
-                                <th className="py-6 px-6 text-[10px] font-black text-white uppercase tracking-[0.3em] text-right">Pendiente</th>
+                                <th className="py-6 px-6 text-[10px] font-black text-white uppercase tracking-[0.3em] text-right">Restante</th>
                                 <th className="py-6 px-6 text-[10px] font-black text-white uppercase tracking-[0.3em] text-center">Estado</th>
-                                <th className="py-6 px-6 text-[10px] font-black text-white uppercase tracking-[0.3em] text-center">Contrato</th>
-                                <th className="py-6 px-6 text-[10px] font-black text-white uppercase tracking-[0.3em] text-center">Acciones</th>
+                                <th className="py-6 px-3 text-[10px] font-black text-white uppercase tracking-[0.3em] text-center">Contrato</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 bg-[#d3e0e5]">
                             {currentItems.length > 0 ? (
                                 currentItems.map((user, idx) => {
-                                    const estadoBadge = getEstadoBadge(user.estadoPago);
+                                    const estadoBadge = getEstadoBadge(user);
                                     const rowKey = user.id;
 
                                     return (
@@ -324,7 +369,7 @@ export default function StpAccountsTable({
                                                 }}
                                                 onClick={() => setExpandedUser(expandedUser === rowKey ? null : rowKey)}
                                             >
-                                                <td className="py-3 px-6">
+                                                <td className="py-2 px-7">
                                                     <div className="flex items-center gap-3">
                                                         <div className="relative">
                                                             <FaUserCircle className="text-slate-400 text-2xl group-hover:text-teal-500 transition-all duration-300 group-hover:scale-110" />
@@ -362,14 +407,14 @@ export default function StpAccountsTable({
                                                     </div>
                                                 </td>
 
-                                                <td className="py-3 px-6">
+                                                <td className="py-2 px-7">
                                                     <div className="space-y-1">
                                                         <div className="flex justify-between text-xs">
-                                                            <span className="text-slate-600">Crédito:</span>
+                                                            <span className="text-slate-600">Valor Factura:</span>
                                                             <span className="font-bold text-slate-800">{formatMonto(user.creditoTotal)}</span>
                                                         </div>
                                                         <div className="flex justify-between text-xs">
-                                                            <span className="text-slate-600">Pagado:</span>
+                                                            <span className="text-slate-600">Monto acumulado:</span>
                                                             <span className="font-bold text-[#279a94]">{formatMonto(user.montoPagado)}</span>
                                                         </div>
                                                         {user.tienePlan && (
@@ -383,78 +428,61 @@ export default function StpAccountsTable({
                                                     </div>
                                                 </td>
 
-                                                <td className="py-3 px-6 text-right">
-                                                    <p className={`font-black text-lg ${user.saldoPendiente > 0 ? 'text-red-600' : 'text-[#279a94]'}`}>
+                                                <td className="py-2 px-6 text-right">
+                                                    <p className={`font-black text-[13px] ${user.saldoPendiente > 0 ? 'text-red-600' : 'text-[#279a94]'}`}>
                                                         {formatMonto(user.saldoPendiente)}
                                                     </p>
-                                                    {user.tienePlan && user.saldoPendiente > 0 && (
+
+                                                    {user.tienePlan && (
                                                         <p className="text-[10px] text-slate-400 mt-1">
-                                                            {user.numeroPago}/{user.totalPagos} pagos
+                                                            {/* Usamos los nombres que vienen de la base de datos que acabamos de corregir */}
+                                                            {user.pagos_realizados ?? 0} de {user.plazo_credito_meses ?? 0} pagos
                                                         </p>
                                                     )}
                                                 </td>
 
-                                                <td className="py-3 px-6 text-center">
-                                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-md ${estadoBadge.className}`}>
-                                                        {estadoBadge.icon}
-                                                        {estadoBadge.text}
-                                                    </span>
+                                                <td className="py-2 px-4 text-center">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        {/* El Badge dinámico (PAGAR HOY / PENDIENTE / VENCIDO) */}
+                                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[8px] font-black uppercase tracking-wider shadow-md ${estadoBadge.className}`}>
+                                                            {estadoBadge.icon}
+                                                            {estadoBadge.text}
+                                                        </span>
+
+                                                        {/* --- CORRECCIÓN: Solo mostrar el monto si montoDisplay > 0 --- */}
+                                                        {user.montoDisplay > 0 && user.estadoPago !== 'pagado' && (
+                                                            <div className="flex flex-col items-center animate-fadeIn">
+                                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
+                                                                    Total a pagar:
+                                                                </p>
+                                                                <p className="text-[12px] font-black text-slate-700 leading-none">
+                                                                    {formatMonto(user.montoDisplay)}
+                                                                </p>
+                                                                {user.moratoria > 0 && user.estadoPago === 'vencido' && (
+                                                                    <span className="text-[8px] text-red-500 font-bold">
+                                                                        (Incluye moratoria)
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </td>
 
-                                                <td className="py-3 px-6 text-center">
+                                                <td className="py-2 px-3 text-center">
                                                     <span className="inline-block bg-white/80 text-slate-700 px-3 py-1 rounded-full text-[10px] font-bold border border-slate-200 shadow-sm">
                                                         {user.referencia_interna || 'S/R'}
                                                     </span>
-                                                </td>
-
-                                                <td className="py-3 px-6 text-center">
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleCopy(user.clabe_stp, rowKey);
-                                                            }}
-                                                            className="p-2 rounded-xl text-slate-500 hover:text-teal-600 hover:bg-white transition-all duration-300 shadow-sm"
-                                                        >
-                                                            <FaCopy size={14} />
-                                                        </button>
-                                                    </div>
                                                 </td>
                                             </tr>
 
                                             {/* Fila Expandida */}
                                             {expandedUser === rowKey && user.tienePlan && (
-                                                <tr className="bg-white/50 backdrop-blur-sm">
-                                                    <td colSpan="6" className="py-6 px-8 border-x-2 border-teal-500/20">
-                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
-                                                            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-                                                                <h4 className="text-[10px] font-black text-teal-600 uppercase mb-3 flex items-center gap-2">
-                                                                    <FaWallet /> Crédito
-                                                                </h4>
-                                                                <div className="space-y-2">
-                                                                    <div className="flex justify-between text-sm"><span className="text-slate-500">Monto Base:</span><span className="font-bold">{formatMonto(user.paymentPlan.credito)}</span></div>
-                                                                    <div className="flex justify-between text-sm"><span className="text-slate-500">Enganche:</span><span className="font-bold">{formatMonto(user.paymentPlan.enganche)}</span></div>
-                                                                </div>
-                                                            </div>
-                                                            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-                                                                <h4 className="text-[10px] font-black text-teal-600 uppercase mb-3 flex items-center gap-2">
-                                                                    <FaChartLine /> Mensualidad
-                                                                </h4>
-                                                                <div className="space-y-2">
-                                                                    <div className="flex justify-between text-sm"><span className="text-slate-500">Pago Normal:</span><span className="font-bold">{formatMonto(user.montoNormal)}</span></div>
-                                                                    <div className="flex justify-between text-sm"><span className="text-slate-500">Mora:</span><span className="font-bold text-red-500">{formatMonto(user.moratoria)}</span></div>
-                                                                </div>
-                                                            </div>
-                                                            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-                                                                <h4 className="text-[10px] font-black text-teal-600 uppercase mb-3 flex items-center gap-2">
-                                                                    <FaCalendarAlt /> Próximo Pago
-                                                                </h4>
-                                                                <div className="space-y-2 text-center">
-                                                                    <p className="text-lg font-black text-slate-800">{formatFecha(user.fechaVencimiento)}</p>
-                                                                    <p className="text-[10px] text-slate-400">Referencia: {user.referencia_interna}</p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
+                                                <tr className="bg-slate-50/50 backdrop-blur-md">
+                                                    <td colSpan="6" className="py-8 px-10 border-x-4 border-teal-500/30">
+                                                        <PlanDetalleEditable
+                                                            user={user}
+                                                            onUpdate={onRefresh}
+                                                        />
                                                     </td>
                                                 </tr>
                                             )}

@@ -222,7 +222,10 @@ export default function Dashboard() {
                                 endUsers={endUsers}
                                 onCopy={copyToClipboard}
                                 loading={loading}
-                                onRefresh={fetchMyEndUsers}
+                                onRefresh={() => {
+
+                                    fetchMyEndUsers();
+                                }}
                                 onViewBalance={handleViewBalance}
                                 getPaymentPlanForUser={getPaymentPlanForUser}
                             />

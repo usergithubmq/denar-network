@@ -25,7 +25,7 @@ const BrandCarousel = () => {
     const repeatedBrands = [...brands, ...brands, ...brands, ...brands];
 
     return (
-        <div className="relative w-full overflow-hidden bg-white/40 py-8 rounded-[2rem] border border-white/60 backdrop-blur-sm shadow-sm">
+        <div className="relative w-full overflow-hidden bg-white/10 py-8 rounded-[2rem] border border-white/10 backdrop-blur-sm shadow-sm">
             <motion.div
                 className="flex gap-16 items-center w-20" // w-max es clave para que no se amontonen
                 animate={{ x: [0, -1500] }} // Ajustamos el recorrido

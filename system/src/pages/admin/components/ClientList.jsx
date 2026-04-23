@@ -74,10 +74,10 @@ export default function ClientList() {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-[#051d26]">
-                                <th className="p-7 text-[11px] font-normal text-white uppercase tracking-[0.4em]">Identidad Digital</th>
-                                <th className="p-7 text-[11px] font-normal text-white uppercase tracking-[0.4em]">Protocolo Fiscal</th>
+                                <th className="p-7 text-[11px] font-normal text-white uppercase tracking-[0.4em]">NOMBRE</th>
+                                <th className="p-7 text-[11px] font-normal text-white uppercase tracking-[0.4em]">RFC</th>
                                 <th className="p-7 text-[11px] font-normal text-white uppercase tracking-[0.4em]">STP (CLABE)</th>
-                                <th className="p-7 text-[11px] font-normal text-white uppercase tracking-[0.4em]">Estado del Nodo</th>
+                                <th className="p-7 text-[11px] font-normal text-white uppercase tracking-[0.4em]">ESTADO</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/[0.03]">
@@ -104,10 +104,10 @@ export default function ClientList() {
                                         </td>
                                         <td className="p-7">
                                             <div className="flex flex-col gap-1.5">
-                                                <p className="text-[17px] font-mono font-black text-[#60e2ff] tracking-tighter">
+                                                <p className="text-[16px] font-mono font-normal text-slate-200 tracking-tighter">
                                                     {client.rfc}
                                                 </p>
-                                                <span className="text-[10px] w-fit px-2 py-0.5 rounded bg-white/5 border border-white/5 text-slate-400 font-bold uppercase tracking-widest">
+                                                <span className="text-[10px] w-fit px-2 py-0.5 rounded bg-white/5 border border-white/5 text-[#60e2ff] font-bold uppercase tracking-widest">
                                                     {client.tipo_cliente === 'empresa' ? 'B2B Moral' : 'B2C Física'}
                                                 </span>
                                             </div>

@@ -1,8 +1,7 @@
-// src/pages/end_user/components/CheckoutButton.jsx
 import React from 'react';
 import { CreditCard, ArrowRight } from 'lucide-react';
 
-const CheckoutButton = ({ monto, clienteNombre, onOpenModal }) => {
+const BotonPagoTarjeta = ({ monto, clienteNombre, onOpenModal }) => {
     // 1. Eliminamos el alert estorboso
     // 2. Usamos onOpenModal que viene por props
 
@@ -20,7 +19,7 @@ const CheckoutButton = ({ monto, clienteNombre, onOpenModal }) => {
 
                     <div className="flex flex-col">
                         <p className="text-[10px] font-black text-[#279a94] uppercase tracking-widest leading-none mb-1">
-                            Pago Seguro
+                            Ingresa tus datos
                         </p>
                         <p className="text-white font-bold tracking-tight">
                             Pagar con Tarjeta
@@ -38,4 +37,4 @@ const CheckoutButton = ({ monto, clienteNombre, onOpenModal }) => {
     );
 };
 
-export default CheckoutButton;
+export default BotonPagoTarjeta;

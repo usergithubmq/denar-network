@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Route;
 
 // Controladores
 use App\Http\Controllers\Api\EnrolamientoController;
+use App\Http\Controllers\Api\CashPaymentController;
+use App\Http\Controllers\Api\UserWalletController;
 
 use App\Http\Controllers\Auth\PhoneVerificationController;
 use App\Http\Controllers\Auth\LoginController;
@@ -14,7 +16,6 @@ use App\Http\Controllers\Admin\ClientController;
 use App\Http\Controllers\Cliente\ProfileController;
 use App\Http\Controllers\Cliente\EndUserController;
 use App\Http\Controllers\Cliente\PlanPagoController;
-use App\Http\Controllers\Cliente\UserWalletController;
 
 use App\Http\Controllers\ReporteController;
 
@@ -88,7 +89,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/reporte-conciliacion', [ReporteController::class, 'reporteConciliacion']);
         Route::post('/plan-pago/generar', [PlanPagoController::class, 'generarPlan']);
         Route::get('/plan-pago/resumen/{clabe}', [PlanPagoController::class, 'obtenerResumen']);
-
+        Route::put('/plan-pago/actualizar/{id}', [PlanPagoController::class, 'update']);
         Route::post('/consultar-pago', [PlanPagoController::class, 'obtenerResumen']);
     });
 
@@ -100,14 +101,13 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // 4. APP MÓVIL - CLIENTE FINAL (DenarApp)
-    Route::middleware(['auth:sanctum', 'role:cliente_final'])->prefix('my')->group(function () {
-
+    Route::middleware(['auth:sanctum'])->prefix('my')->group(function () {
         // Dashboard Principal: Saldo, CLABE y Estatus
         Route::get('/dashboard', [UserWalletController::class, 'getDashboard']);
 
         // Finanzas e Historial (Lo que ya tienes en la tabla stp_abonos)
         Route::get('/payments', [UserWalletController::class, 'getPaymentHistory']);
-
+        Route::post('/payment/cash-reference', [CashPaymentController::class, 'generateReference']);
         // Pasarela de Pagos (Para integrar Stripe/Checkout más tarde)
         // Route::post('/generate-checkout', [UserWalletController::class, 'createCheckoutSession']);
 
