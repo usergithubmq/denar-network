@@ -1,21 +1,22 @@
 import axios from "axios";
 
-const baseURL = import.meta.env.MODE === 'production'
-    ? 'https://app.denar.network'
-    : 'http://localhost:8000';
+// Si existe VITE_API_URL en el .env, la usamos. 
+// Si no, caemos en los valores por defecto.
+const baseURL = import.meta.env.VITE_API_URL ||
+    (import.meta.env.MODE === 'production'
+        ? 'https://app.denar.network'
+        : 'http://localhost:8000');
 
-// Configuración unificada para manejar credenciales y tokens automáticamente
 const axiosConfig = {
     baseURL: baseURL,
-    withCredentials: true,    // Indispensable para que las cookies viajen
-    withXSRFToken: true,      // Envía el token CSRF automáticamente
+    withCredentials: true,
+    withXSRFToken: true,
     headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
     }
 };
 
-// 1. Instancia para peticiones globales (úsala para /sanctum/csrf-cookie)
 export const authApi = axios.create(axiosConfig);
 
 // 2. Instancia para la API (con prefijo /api)

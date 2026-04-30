@@ -21,7 +21,10 @@ export default function ProfileView({ clienteInfo, onUpdate }) {
     const [showPassword, setShowPassword] = useState(false);
 
     const fileInputRef = useRef(null);
-    const baseUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://app.denar.network';
+
+    // --- CAMBIO CLAVE: Detecta automáticamente la URL del Backend ---
+    const baseUrl = import.meta.env.VITE_API_URL || window.location.origin;
+
     const [preview, setPreview] = useState(null);
 
     useEffect(() => {
@@ -35,6 +38,7 @@ export default function ProfileView({ clienteInfo, onUpdate }) {
                 login_slogan: clienteInfo.login_slogan || '',
                 logo: null
             });
+            // Ahora baseUrl siempre apuntará al servidor correcto (Sandbox o Producción)
             if (clienteInfo.logo_url) setPreview(`${baseUrl}/storage/${clienteInfo.logo_url}`);
         }
     }, [clienteInfo, baseUrl]);
@@ -90,17 +94,14 @@ export default function ProfileView({ clienteInfo, onUpdate }) {
     return (
         <div className="max-w-5xl mx-auto space-y-4 py-6 px-4 font-sans text-slate-800">
 
-            {/* SECCIÓN 1: BRANDING & IDENTIDAD (COMPACTA) */}
+            {/* SECCIÓN 1: BRANDING & IDENTIDAD */}
             <form onSubmit={handleUpdateProfile} className="bg-[#d3e0e5] rounded-2xl shadow-sm border border-[#b8bfc0] overflow-hidden">
                 <div className="bg-[#051d26] px-6 py-4 flex items-center justify-between border-b border-[#60e2ff]"
                     style={{
-                        // 1. Animación más lenta (8s para un barrido cinematográfico)
                         animation: 'shimmer-slow 8s linear infinite',
-                        // 2. Gradiente con el color del cliente al 80% de opacidad (cc) 
-                        // 3. El centro (50%) ahora es más ancho para que el color resalte
                         backgroundImage: `linear-gradient(90deg, #051a22 0%, ${brandColor}cc 20%, #062b3b 100%)`,
                         backgroundSize: '200% 100%',
-                        borderBottom: `5px solid ${brandColor}66` // Borde más presente
+                        borderBottom: `5px solid ${brandColor}66`
                     }}>
                     <div className="flex items-center gap-4">
                         <div className="relative group w-14 h-14 shrink-0">
@@ -151,7 +152,7 @@ export default function ProfileView({ clienteInfo, onUpdate }) {
                 }} className="hidden" accept="image/*" />
             </form>
 
-            {/* SECCIÓN 2: SEGURIDAD (COMPACTA) */}
+            {/* SECCIÓN 2: SEGURIDAD */}
             <div className="bg-[#d3e0e5] rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div
                     className="px-6 py-4 flex items-center gap-3 text-white"
@@ -159,15 +160,13 @@ export default function ProfileView({ clienteInfo, onUpdate }) {
                         animation: 'shimmer-slow 8s linear infinite',
                         backgroundImage: `linear-gradient(90deg, #051a22 0%, ${brandColor}cc 20%, #062b3b 100%)`,
                         backgroundSize: '200% 100%',
-                        borderBottom: `5px solid ${brandColor}66` // Mismo borde que el de Branding
+                        borderBottom: `5px solid ${brandColor}66`
                     }}
                 >
-                    {/* Ícono dinámico */}
                     <FaLock size={14} style={{ color: brandColor }} />
                     <span className="text-[10px] font-black uppercase tracking-widest">Protocolo de Acceso</span>
                 </div>
 
-                {/* CAMBIO: Vinculamos la función handleUpdatePassword */}
                 <form onSubmit={handleUpdatePassword} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                     <div className="space-y-4">
                         <div className="relative">
@@ -192,7 +191,6 @@ export default function ProfileView({ clienteInfo, onUpdate }) {
                             />
                         </div>
 
-                        {/* BOTÓN: Ahora mostrará el spinner y reaccionará al envío */}
                         <button
                             type="submit"
                             disabled={!isPassStrong || loadingPass}
@@ -202,7 +200,6 @@ export default function ProfileView({ clienteInfo, onUpdate }) {
                         </button>
                     </div>
 
-                    {/* Indicadores de fuerza (se mantienen igual) */}
                     <div className="grid grid-cols-1 gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-100">
                         {Object.entries({ "10+ Caracteres": checks.length, "Mayúscula": checks.upper, "Números": checks.number, "Símbolo": checks.symbol, "Coinciden": checks.match }).map(([label, met]) => (
                             <div key={label} className="flex items-center gap-3">
