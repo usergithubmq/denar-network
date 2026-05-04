@@ -12,6 +12,7 @@ import KoonSidebar from "./components/KoonSidebar";
 import KoonFooter from "./components/KoonFooter";
 import BrandCarousel from './components/BrandCarousel';
 import PagoTarjetaModal from './components/modal/PagoTarjetaModal';
+import ModalCash from './components/modal/ModalCash';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -80,7 +81,6 @@ const Dashboard = () => {
             );
             if (response.data.status === 'success') {
                 setActiveReference(response.data.data);
-                setIsModalOpen(true);
             }
         } catch (error) {
             console.error("Error generating cash ref:", error.response?.data?.message);
@@ -179,6 +179,15 @@ const Dashboard = () => {
                         onClose={() => { setIsModalOpen(false); setActiveReference(null); }}
                         monto={planActivo ? planActivo.pago_pendiente : 0}
                         referenceData={activeReference}
+                    />
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {activeReference && (
+                    <ModalCash
+                        data={activeReference}
+                        onClose={() => setActiveReference(null)}
                     />
                 )}
             </AnimatePresence>

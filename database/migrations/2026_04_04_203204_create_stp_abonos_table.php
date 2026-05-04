@@ -46,10 +46,13 @@ return new class extends Migration
             $table->string('ts_liquidacion', 25);
             $table->string('folio_codi', 40)->nullable();
 
+            $table->string('metodo_pago')->default('STP'); // STP o EFECTIVO
+            $table->foreignId('cliente_id')->nullable()->constrained('users'); // La empresa dueña del dinero
+            $table->decimal('comision_denar', 10, 2)->default(0); // Tu ganancia por esa transa
+
             $table->timestamps();
 
             // --- SECCIÓN DE ÍNDICES (El motor de búsqueda de Denar) ---
-
 
             $table->index('cuenta_beneficiario');
             $table->index('fecha_operacion');

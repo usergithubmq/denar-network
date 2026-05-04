@@ -38,6 +38,15 @@ class StpAbono extends Model
         'empresa',
         'tipo_pago',
         'ts_liquidacion',
-        'folio_codi'
+        'folio_codi',
+
+        'metodo_pago',
+        'cliente_id',
+        'comision_denar'
     ];
+
+    public function cliente()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'cliente_id');
+    }
 }

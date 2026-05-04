@@ -5,7 +5,6 @@ use Illuminate\Support\Facades\Route;
 
 // Controladores
 use App\Http\Controllers\Api\EnrolamientoController;
-use App\Http\Controllers\Api\CashPaymentController;
 use App\Http\Controllers\Api\UserWalletController;
 
 use App\Http\Controllers\Auth\PhoneVerificationController;
@@ -63,6 +62,43 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/check-inventory', [ClientController::class, 'checkInventory']);
         Route::post('/clients', [ClientController::class, 'store']);
         Route::get('/clients', [ClientController::class, 'index']);
+        Route::get('/stp-logs', function (Illuminate\Http\Request $request) {
+            // Cargamos la relación 'cliente' (asegúrate de tenerla en el modelo StpAbono)
+            $query = \App\Models\StpAbono::with('cliente');
+
+            // 1. Filtro por búsqueda (Rastreo, Ordenante, Concepto)
+            if ($request->filled('search')) {
+                $s = $request->search;
+                $query->where(function ($q) use ($s) {
+                    $q->where('clave_rastreo', 'LIKE', "%$s%")
+                        ->orWhere('nombre_ordenante', 'LIKE', "%$s%")
+                        ->orWhere('concepto_pago', 'LIKE', "%$s%");
+                });
+            }
+
+            // 2. Filtro por Empresa específica (Para tus cortes de caja mensuales)
+            if ($request->filled('cliente_id')) {
+                $query->where('cliente_id', $request->cliente_id);
+            }
+
+            // 3. Filtro por Método (Para separar Efectivo de Transferencias)
+            if ($request->filled('metodo')) {
+                $query->where('metodo_pago', $request->metodo);
+            }
+
+            // Retornamos los últimos 100 con la data de la empresa incluida
+            return $query->orderBy('created_at', 'desc')->take(100)->get();
+        });
+
+        Route::get('/dashboard-stats', function () {
+            return response()->json([
+                'clientes'        => \App\Models\User::where('role', 'cliente')->count(), // O tu lógica de clientes
+                'usuarios_activos' => \App\Models\User::count(),
+                'ingreso_mensual'  => \App\Models\StpAbono::whereMonth('created_at', now()->month)->sum('monto'),
+                'ingreso_total'    => \App\Models\StpAbono::sum('monto'),
+                'saldo_actual'     => \App\Models\StpAbono::sum('monto'), // Ajusta según tu lógica de egresos
+            ]);
+        });
     });
 
     // 2. DASHBOARD CLIENTE (Empresas B2B)
@@ -107,7 +143,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Finanzas e Historial (Lo que ya tienes en la tabla stp_abonos)
         Route::get('/payments', [UserWalletController::class, 'getPaymentHistory']);
-        Route::post('/payment/cash-reference', [CashPaymentController::class, 'generateReference']);
+        Route::post('/payment/cash-reference', [StpWebhookController::class, 'generarReferenciaEfectivo']);
         // Pasarela de Pagos (Para integrar Stripe/Checkout más tarde)
         // Route::post('/generate-checkout', [UserWalletController::class, 'createCheckoutSession']);
 
