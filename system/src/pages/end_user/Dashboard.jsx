@@ -93,6 +93,30 @@ const Dashboard = () => {
         }
     };
 
+    const handleUpdateCashAmount = async (newAmount) => {
+        if (newAmount <= 0) return alert("Ingresa un monto válido.");
+
+        setGeneratingReference(true);
+        try {
+            const token = localStorage.getItem("token");
+            // Llamamos al mismo endpoint pero enviando el nuevo monto manual
+            const response = await axios.post('/api/my/payment/cash-reference',
+                { monto: newAmount },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            if (response.data.status === 'success') {
+                // Actualizamos la referencia activa con los nuevos datos (nueva referencia y monto)
+                setActiveReference(response.data.data);
+            }
+        } catch (error) {
+            console.error("Error actualizando monto cash:", error.response?.data?.message);
+            alert("No se pudo actualizar el monto. Intenta de nuevo.");
+        } finally {
+            setGeneratingReference(false);
+        }
+    };
+
     if (loading) return (
         <div className="flex h-screen items-center justify-center bg-[#010e24]">
             <div className="relative flex flex-col items-center gap-6">
@@ -195,6 +219,7 @@ const Dashboard = () => {
                     <ModalCash
                         data={activeReference}
                         onClose={() => setActiveReference(null)}
+                        onRefreshReference={handleUpdateCashAmount}
                     />
                 )}
             </AnimatePresence>
