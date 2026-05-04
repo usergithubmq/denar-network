@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaTimes, FaCheckCircle, FaShieldAlt, FaSearch } from 'react-icons/fa';
+import Swal from 'sweetalert2';
 import api from "../../../../api/axios";
 
-const FormClienteModal = ({ isOpen, onClose, formData, setFormData, handleSubmit, loading }) => {
+const FormClienteModal = ({ isOpen, onClose, formData, setFormData, handleSubmit, loading, onClientCreated }) => {
     const [nodosOcupados, setNodosOcupados] = useState([]);
     const [loadingInventory, setLoadingInventory] = useState(false);
 
@@ -15,7 +16,17 @@ const FormClienteModal = ({ isOpen, onClose, formData, setFormData, handleSubmit
         setLoadingInventory(true);
         try {
             const res = await api.get("/admin/check-inventory");
-            setNodosOcupados(res.data);
+
+            /** 
+             * CRÍTICO: Normalizamos los datos de la API.
+             * Si la API manda [1, 2] o ["1", "2"], lo convertimos a ["001", "002"]
+             * para que coincida exactamente con nuestro array de comparación.
+             */
+            const normalizados = Array.isArray(res.data)
+                ? res.data.map(n => n.toString().padStart(3, '0'))
+                : [];
+
+            setNodosOcupados(normalizados);
         } catch (err) {
             console.error("Error cargando inventario", err);
         } finally {
@@ -23,7 +34,43 @@ const FormClienteModal = ({ isOpen, onClose, formData, setFormData, handleSubmit
         }
     };
 
+    const handleLocalSubmit = async (e) => {
+        e.preventDefault();
+        const success = await handleSubmit(e);
+
+        if (success) {
+            Swal.fire({
+                title: 'NODO PROVISIONADO',
+                html: `
+                    <div class="text-left space-y-3">
+                        <p class="text-[10px] uppercase tracking-widest text-slate-400">Infraestructura lista para:</p>
+                        <p class="text-lg font-black text-[#57c2ce]">${formData.nombre_comercial}</p>
+                        <div class="p-4 bg-black/20 rounded-2xl border border-white/5 font-mono">
+                            <p class="text-[8px] text-slate-500 uppercase mb-1">ID de Nodo de Red</p>
+                            <p class="text-sm text-[#57c2ce]">${formData.clabe_stp_intermedia}</p>
+                        </div>
+                    </div>
+                `,
+                icon: 'success',
+                background: '#051d26',
+                color: '#ffffff',
+                confirmButtonColor: '#82c9c4',
+                confirmButtonText: 'CONFIRMAR Y FINALIZAR',
+                customClass: {
+                    popup: 'rounded-[2.5rem] border border-white/10 shadow-2xl',
+                    confirmButton: 'rounded-xl px-8 py-3 text-[10px] font-black uppercase tracking-widest text-[#051d26]'
+                }
+            });
+
+            if (onClientCreated) onClientCreated();
+            onClose();
+        }
+    };
+
+    // Generamos el rango 000 al 020
     const todosLosNodos = Array.from({ length: 21 }, (_, i) => i.toString().padStart(3, '0'));
+
+    // FILTRADO REAL: Solo se muestran los que NO están en nodosOcupados
     const nodosDisponibles = todosLosNodos.filter(n => !nodosOcupados.includes(n));
 
     if (!isOpen) return null;
@@ -43,7 +90,6 @@ const FormClienteModal = ({ isOpen, onClose, formData, setFormData, handleSubmit
                     exit={{ opacity: 0, scale: 0.95, y: 20 }}
                     className="relative w-full max-w-7xl bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]"
                 >
-                    {/* COLUMNA IZQUIERDA: Branding (Más delgada y compacta) */}
                     <div className="w-full md:w-[30%] bg-[#051d26] p-10 flex flex-col justify-between relative overflow-hidden">
                         <div className="relative z-10">
                             <FaShieldAlt className="text-[#57c2ce] mb-6" size={28} />
@@ -56,14 +102,12 @@ const FormClienteModal = ({ isOpen, onClose, formData, setFormData, handleSubmit
                         <img src="/denarTexto.png" alt="Logo" className="h-20 opacity-40 self-start" />
                     </div>
 
-                    {/* COLUMNA DERECHA: Formulario (Espaciado optimizado) */}
                     <div className="flex-1 p-8 md:p-12 bg-white relative overflow-hidden flex flex-col justify-center">
                         <button onClick={onClose} className="absolute top-8 right-8 text-slate-300 hover:text-rose-500 transition-all">
                             <FaTimes size={20} />
                         </button>
 
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            {/* Selector Tipo Persona */}
+                        <form onSubmit={handleLocalSubmit} className="space-y-6">
                             <div className="flex gap-4">
                                 {['empresa', 'fisica'].map(type => (
                                     <button
@@ -75,7 +119,6 @@ const FormClienteModal = ({ isOpen, onClose, formData, setFormData, handleSubmit
                                             : 'bg-slate-50 text-slate-400 border-slate-100'
                                             }`}
                                     >
-                                        {/* CORRECCIÓN AQUÍ: Si el tipo es 'empresa' muestra 'Empresa', sino 'Individuo' */}
                                         {type === 'empresa' ? 'Empresa' : 'Individuo'}
                                     </button>
                                 ))}
@@ -113,7 +156,6 @@ const FormClienteModal = ({ isOpen, onClose, formData, setFormData, handleSubmit
                                     />
                                 </div>
 
-                                {/* SELECTOR DE TRONCO STP DINÁMICO (Más compacto) */}
                                 <div className="col-span-12 space-y-3">
                                     <div className="flex justify-between items-center px-1">
                                         <label className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">
@@ -122,23 +164,31 @@ const FormClienteModal = ({ isOpen, onClose, formData, setFormData, handleSubmit
                                         {loadingInventory && <span className="text-[8px] text-[#57c2ce] animate-pulse font-bold">SCANNING...</span>}
                                     </div>
 
+                                    {/* GRID DINÁMICO: Solo muestra lo filtrado */}
                                     <div className="grid grid-cols-7 gap-2 p-1">
-                                        {nodosDisponibles.map((nodo) => (
-                                            <button
-                                                key={nodo}
-                                                type="button"
-                                                onClick={() => setFormData({ ...formData, clabe_stp_intermedia: `6461806665${nodo}` })}
-                                                className={`py-2.5 rounded-lg border font-mono text-[10px] transition-all ${formData.clabe_stp_intermedia?.endsWith(nodo)
-                                                    ? 'bg-[#051d26] text-[#57c2ce] border-[#051d26] shadow-md scale-105'
-                                                    : 'bg-white text-slate-400 border-slate-200 hover:border-[#57c2ce]/50'
-                                                    }`}
-                                            >
-                                                #{nodo}
-                                            </button>
-                                        ))}
+                                        {nodosDisponibles.length > 0 ? (
+                                            nodosDisponibles.map((nodo) => (
+                                                <button
+                                                    key={nodo}
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, clabe_stp_intermedia: `6461806665${nodo}` })}
+                                                    className={`py-2.5 rounded-lg border font-mono text-[10px] transition-all ${formData.clabe_stp_intermedia?.endsWith(nodo)
+                                                        ? 'bg-[#051d26] text-[#57c2ce] border-[#051d26] shadow-md scale-105'
+                                                        : 'bg-white text-slate-400 border-slate-200 hover:border-[#57c2ce]/50'
+                                                        }`}
+                                                >
+                                                    #{nodo}
+                                                </button>
+                                            ))
+                                        ) : (
+                                            <div className="col-span-7 py-4 text-center bg-rose-50 rounded-xl border border-rose-100">
+                                                <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">
+                                                    No hay nodos de red disponibles
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* VISUALIZADOR DE CLABE SELECCIONADA (Inline para ahorrar espacio) */}
                                     <div className="py-3 px-5 bg-slate-900 rounded-2xl flex justify-between items-center border border-white/5">
                                         <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">CLABE Seleccionada:</span>
                                         <span className="text-xs font-mono font-bold text-[#57c2ce]">

@@ -61,6 +61,10 @@ const Dashboard = () => {
         fetchDashboardData();
     }, [navigate]);
 
+    const handleLogout = () => {
+        localStorage.clear(); // Limpia token y datos de sesión
+        navigate("/login");    // Redirige al inicio
+    };
     // Lógica para obtener los datos del plan que se está mostrando actualmente
     const planActivo = wallet.planes && wallet.planes.length > 0
         ? wallet.planes[currentPlanIndex]
@@ -103,7 +107,10 @@ const Dashboard = () => {
 
     return (
         <div className="min-h-screen bg-[#ffffff] text-[#010e24] flex overflow-x-hidden selection:bg-primary/20">
-            <KoonSidebar clienteInfo={clienteInfo} />
+            <KoonSidebar
+                clienteInfo={clienteInfo}
+                handleLogout={handleLogout}
+            />
 
             <main className="flex-1 ml-64 relative">
                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none" />

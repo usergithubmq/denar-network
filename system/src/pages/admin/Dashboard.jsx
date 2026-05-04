@@ -1,7 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import axios from "axios";
 import api, { authApi } from "../../api/axios";
 
 // Componentes Core Fraccionados
@@ -18,13 +17,16 @@ export default function Dashboard() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    // Este estado servirá para forzar el re-renderizado de las listas en tiempo real
+    const [refreshKey, setRefreshKey] = useState(0);
+
     // Estado inicial del formulario
     const initialFormState = {
         nombre_comercial: "",
         email: "",
         rfc: "",
-        clabe_stp_intermedia: "", // CAMPO CRÍTICO
-        tipo_cliente: 'empresa', // <--- CAMBIO AQUÍ
+        clabe_stp_intermedia: "",
+        tipo_cliente: 'empresa',
         first_last: "",
         second_last: "",
         password: "password123"
@@ -32,12 +34,25 @@ export default function Dashboard() {
 
     const [formData, setFormData] = useState(initialFormState);
 
-    const handleLogout = () => { navigate("/login"); };
+    // 1. FUNCIÓN DE REFRESCO (Visible para todo el componente)
+    const refreshData = useCallback(() => {
+        console.log("Refrescando datos del sistema...");
+        setRefreshKey(prev => prev + 1); // Incrementamos la clave para forzar actualización
+    }, []);
+
+    // 2. EFECTO INICIAL
+    useEffect(() => {
+        refreshData();
+    }, [refreshData]);
+
+    const handleLogout = () => {
+        localStorage.clear();
+        navigate("/login");
+    };
 
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
 
-        // Validación manual antes de disparar
         if (!formData.clabe_stp_intermedia) {
             alert("Error: No has seleccionado un nodo (Tronco STP)");
             return;
@@ -47,7 +62,6 @@ export default function Dashboard() {
         try {
             await authApi.get("/sanctum/csrf-cookie");
 
-            // Generar slug basado en el nuevo nombre de campo
             const generatedSlug = formData.nombre_comercial
                 .toLowerCase()
                 .trim()
@@ -56,24 +70,20 @@ export default function Dashboard() {
 
             const dataToSync = { ...formData, slug: generatedSlug };
 
-            // Enviar a la ruta que definimos en el Controller
             await api.post("/admin/clients", dataToSync);
 
-            alert("¡Nodo Aprovisionado con Éxito!");
-            setIsModalOpen(false);
-            setFormData(initialFormState);
-            setView("list");
+            // Si llegamos aquí, fue exitoso. Retornamos true para que el modal sepa qué hacer.
+            return true;
         } catch (err) {
             console.error("Error Detallado:", err.response?.data);
             const msg = err.response?.data?.message || "Error de conexión";
-            const errors = err.response?.data?.errors ? Object.values(err.response.data.errors).flat().join('\n') : "";
-            alert(`Error: ${msg}\n${errors}`);
+            alert(`Error: ${msg}`);
+            return false;
         } finally {
             setLoading(false);
         }
     };
 
-    // Configuración de animación para cambios de vista
     const pageTransition = {
         initial: { opacity: 0, y: 10, scale: 0.99 },
         animate: { opacity: 1, y: 0, scale: 1 },
@@ -90,35 +100,25 @@ export default function Dashboard() {
                 <AdminHeader view={view} openModal={() => setIsModalOpen(true)} />
 
                 <div className="flex-1 overflow-y-auto p-5 relative custom-scrollbar">
-                    {/* Grid tecnológico de fondo sutil */}
                     <div className="absolute inset-0 opacity-[0.02] pointer-events-none"
                         style={{ backgroundImage: 'radial-gradient(#051d26 1.5px, transparent 0)', backgroundSize: '40px 40px' }} />
 
                     <AnimatePresence mode="wait">
-                        {/* VISTA 1: DASHBOARD UNIFICADO (Stats + Logs debajo) */}
                         {view === "dashboard" && (
-                            <motion.div
-                                key="dash"
-                                {...pageTransition}
-                                className="flex flex-col gap-10 pb-20" // Flex col para apilar verticalmente
-                            >
-                                {/* PARTE SUPERIOR: Telemetría comprimida */}
-                                <Estadisticas />
-                                <LogsSistema />
-
+                            <motion.div key={`dash-${refreshKey}`} {...pageTransition} className="flex flex-col gap-10 pb-20">
+                                <Estadisticas key={`stats-${refreshKey}`} />
+                                <LogsSistema key={`logs-${refreshKey}`} />
                             </motion.div>
                         )}
 
-                        {/* VISTA 2: DIRECTORIO DE CLIENTES (Sigue siendo independiente si quieres) */}
                         {view === "list" && (
-                            <motion.div key="list" {...pageTransition} className="w-full pb-20">
-                                <ClientList />
+                            <motion.div key={`list-${refreshKey}`} {...pageTransition} className="w-full pb-20">
+                                <ClientList key={`clist-${refreshKey}`} />
                             </motion.div>
                         )}
 
-                        {/* VISTA 3: Si quisieras ver los Logs solos en pantalla completa */}
                         {view === "logs" && (
-                            <motion.div key="logs" {...pageTransition} className="w-full pb-20">
+                            <motion.div key={`logs-full-${refreshKey}`} {...pageTransition} className="w-full pb-20">
                                 <LogsSistema />
                             </motion.div>
                         )}
@@ -126,13 +126,18 @@ export default function Dashboard() {
                 </div>
             </main>
 
+            {/* MODAL CONECTADO CORRECTAMENTE */}
             <FormClienteModal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setFormData(initialFormState); // Reseteamos al cerrar
+                }}
                 formData={formData}
                 setFormData={setFormData}
                 handleSubmit={handleSubmit}
                 loading={loading}
+                onClientCreated={refreshData} // Pasamos nuestra función de refresco
             />
         </div>
     );

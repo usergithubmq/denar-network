@@ -22,7 +22,7 @@ const ModalCash = ({ data, onClose }) => {
                     </div>
 
                     <h3 className="text-xl font-black uppercase mb-2">Pago en Efectivo</h3>
-                    <p className="text-xs text-[#60e2ff] font-medium mb-8 tracking-widest uppercase">Referencia SinergyPay</p>
+                    <p className="text-xs text-[#60e2ff] font-medium mb-8 tracking-widest uppercase">Referencia pago en efectivo</p>
 
                     <div className="bg-black/20 rounded-2xl p-6 border border-white/5 mb-6">
                         <p className="text-[10px] font-black tracking-[0.3em] text-[#60e2ff] mb-2 uppercase">Número de Referencia</p>

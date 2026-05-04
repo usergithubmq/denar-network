@@ -2,6 +2,8 @@
   "dependencies": {
     "@stripe/react-stripe-js": "^6.0.0",
     "@stripe/stripe-js": "^9.0.0",
-    "lucide-react": "^1.7.0"
+    "lucide-react": "^1.7.0",
+    "sweetalert2": "^11.26.24",
+    "sweetalert2-react-content": "^5.1.2"
   }
 }

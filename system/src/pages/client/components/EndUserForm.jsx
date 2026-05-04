@@ -5,6 +5,7 @@ import {
     FaPercentage, FaEdit, FaExclamationTriangle
 } from "react-icons/fa";
 import api, { authApi } from "../../../api/axios";
+import Swal from 'sweetalert2';
 
 export default function EndUserForm({ onUserCreated }) {
     const [loading, setLoading] = useState(false);
@@ -42,8 +43,8 @@ export default function EndUserForm({ onUserCreated }) {
                 ...prev,
                 monto_normal: prev.monto_normal === "" ? cuotaSugerida : prev.monto_normal,
                 monto_normal_final: prev.monto_normal_final === "" ? cuotaSugerida : prev.monto_normal_final,
-                fecha_vencimiento: fechaVencStr,
-                fecha_limite_habil: fechaLimitStr
+                fecha_vencimiento: prev.fecha_vencimiento === "" ? fechaVencStr : prev.fecha_vencimiento,
+                fecha_limite_habil: prev.fecha_limite_habil === "" ? fechaLimitStr : prev.fecha_limite_habil
             }));
         }
     }, [formData.credito, formData.plazo_credito_meses]);
@@ -102,15 +103,43 @@ export default function EndUserForm({ onUserCreated }) {
                 estado: 'pendiente'
             });
 
-            alert("✅ Registro y Plan de Pago generados.");
+            Swal.fire({
+                title: '¡Operación Exitosa!',
+                text: 'El cliente ha sido registrado y su plan de pago está activo.',
+                icon: 'success',
+                background: '#051d26', // El color oscuro de tu sidebar
+                color: '#ffffff',
+                confirmButtonColor: '#2dd4bf', // El color teal de Denar
+                confirmButtonText: 'Entendido',
+                customClass: {
+                    popup: 'rounded-[2rem] border border-white/10 shadow-2xl',
+                    confirmButton: 'rounded-xl px-10 py-3 text-[10px] font-black uppercase tracking-widest'
+                },
+                showClass: {
+                    popup: 'animate__animated animate__zoomIn'
+                }
+            });
+
+            if (onUserCreated) {
+                onUserCreated();
+            }
+
             resetForm();
+
         } catch (err) {
-            // Esto te dirá exactamente qué campo falló si vuelve a pasar
+
             const errorMsg = err.response?.data?.errors
                 ? Object.values(err.response.data.errors).flat().join(", ")
                 : (err.response?.data?.error || "Error desconocido");
 
-            alert("❌ Error: " + errorMsg);
+            Swal.fire({
+                title: 'Hubo un problema',
+                text: err.response?.data?.message || 'No se pudo completar el registro',
+                icon: 'error',
+                background: '#051d26',
+                color: '#ffffff',
+                confirmButtonColor: '#ef4444'
+            });
             console.error("Error completo:", err.response?.data);
         } finally { setLoading(false); }
     };
